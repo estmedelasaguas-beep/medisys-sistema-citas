@@ -3,45 +3,69 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-  <title>MediSys | Inicio de Sesión y Gestión Médica</title>
+  <title>MediSys · Gestión de Citas Médicas</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased">
-
-  <header class="bg-teal-800 text-white shadow-sm sticky top-0 z-20">
+<body class="min-h-screen flex flex-col bg-slate-100 text-slate-800 antialiased">
+  <header class="bg-teal-900 text-white shadow-md">
     <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-4">
       <div class="flex items-center gap-3">
-        <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-teal-600 font-bold text-sm">MS</span>
+        <div class="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center font-bold text-lg shadow-inner">
+          MS
+        </div>
         <div>
           <h1 class="text-xl font-bold tracking-tight leading-none">MediSys</h1>
-          <p class="text-xs text-teal-100 mt-1">Gestión, disponibilidad y trazabilidad de citas médicas</p>
+          <p class="text-xs text-teal-200 mt-1">Gestión, disponibilidad y trazabilidad de citas médicas</p>
         </div>
       </div>
 
-      <div id="header-session-bar" class="hidden flex flex-wrap items-center gap-3">
-        <nav aria-label="Navegación principal" class="flex flex-wrap gap-2 text-sm">
-          <button type="button" data-tab="agendar" data-role="PACIENTE" class="nav-btn px-3.5 py-2 rounded-lg font-medium bg-white/10 hover:bg-white/20 cursor-pointer">
+      <div id="header-session-bar" class="hidden flex-wrap items-center gap-3">
+        <nav aria-label="Navegación principal" class="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            data-tab="agendar"
+            data-role="PACIENTE"
+            class="nav-btn px-3.5 py-2 rounded-lg text-sm font-medium text-teal-100 hover:bg-teal-800 cursor-pointer"
+          >
             Agendar cita
           </button>
-          <button type="button" data-tab="consultar" data-role="PACIENTE" class="nav-btn px-3.5 py-2 rounded-lg font-medium bg-white/10 hover:bg-white/20 cursor-pointer">
+          <button
+            type="button"
+            data-tab="consultar"
+            data-role="PACIENTE"
+            class="nav-btn px-3.5 py-2 rounded-lg text-sm font-medium text-teal-100 hover:bg-teal-800 cursor-pointer"
+          >
             Mis citas
           </button>
-          <button type="button" data-tab="medico" data-role="MEDICO" class="nav-btn px-3.5 py-2 rounded-lg font-medium bg-white/10 hover:bg-white/20 cursor-pointer">
+          <button
+            type="button"
+            data-tab="medico"
+            data-role="MEDICO"
+            class="nav-btn px-3.5 py-2 rounded-lg text-sm font-medium text-teal-100 hover:bg-teal-800 cursor-pointer"
+          >
             Agenda médica
           </button>
-          <button type="button" data-tab="admin" data-role="ADMIN" class="nav-btn px-3.5 py-2 rounded-lg font-medium bg-white/10 hover:bg-white/20 cursor-pointer">
-            Administración
+          <button
+            type="button"
+            data-tab="admin"
+            data-role="ADMIN"
+            class="nav-btn px-3.5 py-2 rounded-lg text-sm font-medium text-teal-100 hover:bg-teal-800 cursor-pointer"
+          >
+            Panel administrativo
           </button>
         </nav>
 
-        <div class="flex items-center gap-2.5 bg-teal-950/50 px-3 py-1.5 rounded-xl border border-teal-700">
-          <div class="text-right">
-            <p id="session-user-name" class="text-xs font-semibold text-white leading-tight"></p>
-            <p id="session-user-role" class="text-[11px] text-teal-200 uppercase"></p>
+        <div class="flex items-center gap-3 bg-teal-950/60 border border-teal-700/70 rounded-xl px-3 py-1.5">
+          <div class="text-right leading-tight">
+            <p id="session-user-name" class="text-xs font-bold text-white"></p>
+            <p id="session-user-role" class="text-[11px] text-teal-200"></p>
           </div>
-          <button type="button" id="btn-logout" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer">
+          <button
+            id="btn-logout"
+            type="button"
+            class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer"
+          >
             Salir
           </button>
         </div>
@@ -49,35 +73,33 @@
     </div>
   </header>
 
-  <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
-    <div id="banner-alerta" role="alert" class="hidden mb-6 p-4 rounded-xl border text-sm font-medium vista-animada"></div>
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-8">
+    <div id="banner-alerta" class="hidden mb-6 p-4 rounded-xl border text-sm font-medium" role="alert"></div>
 
-    <!-- PANTALLA INICIAL: LOGIN Y REGISTRO DE PACIENTE -->
-    <section id="vista-auth" class="vista-animada max-w-md mx-auto bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
-      <div class="text-center mb-6">
-        <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-50 text-teal-700 font-bold text-lg border border-teal-200 mb-3">
-          MS
-        </span>
-        <h2 class="text-2xl font-bold text-slate-900">Iniciar sesión en MediSys</h2>
-        <p class="text-sm text-slate-500 mt-1">Selecciona tu rol, documento y contraseña para ingresar.</p>
+    <!-- Acceso y Registro -->
+    <section id="vista-auth" class="max-w-md mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 vista-animada">
+      <div class="mb-6">
+        <h2 class="text-2xl font-bold text-slate-900">Acceso al sistema</h2>
+        <p class="text-sm text-slate-500 mt-1">Inicia sesión con tu rol o regístrate como paciente.</p>
       </div>
 
-      <div class="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl mb-6 text-sm font-semibold">
-        <button type="button" id="auth-tab-login" class="py-2 rounded-lg bg-white text-teal-800 shadow-sm cursor-pointer">
+      <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl mb-6 text-sm font-semibold">
+        <button id="auth-tab-login" type="button" class="py-2 rounded-lg bg-white text-teal-800 shadow-sm cursor-pointer">
           Iniciar sesión
         </button>
-        <button type="button" id="auth-tab-register" class="py-2 rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer">
+        <button id="auth-tab-register" type="button" class="py-2 rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer">
           Registrar paciente
         </button>
       </div>
 
-      <!-- FORMULARIO LOGIN -->
-      <form id="form-login" novalidate class="space-y-4">
+      <form id="form-login" class="space-y-4">
         <div>
-          <label for="login-rol" class="block text-sm font-semibold text-slate-700 mb-1">
-            Rol de acceso <span class="text-rose-600">*</span>
-          </label>
-          <select id="login-rol" required class="select-anim w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none">
+          <label for="login-rol" class="block text-sm font-semibold text-slate-700 mb-1">Rol *</label>
+          <select
+            id="login-rol"
+            required
+            class="select-anim w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none"
+          >
             <option value="PACIENTE">Paciente</option>
             <option value="MEDICO">Médico</option>
             <option value="ADMIN">Administrador</option>
@@ -85,169 +107,204 @@
         </div>
 
         <div>
-          <label for="login-documento" class="block text-sm font-semibold text-slate-700 mb-1">
-            Número de documento <span class="text-rose-600">*</span>
-          </label>
-          <input type="text" id="login-documento" required inputmode="numeric" maxlength="15" placeholder="Ej. 1090123456" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none transition" />
+          <label for="login-documento" class="block text-sm font-semibold text-slate-700 mb-1">Documento de identidad *</label>
+          <input
+            id="login-documento"
+            type="text"
+            required
+            placeholder="Ej. 1093596131"
+            class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none"
+          />
         </div>
 
         <div>
-          <label for="login-password" class="block text-sm font-semibold text-slate-700 mb-1">
-            Contraseña <span class="text-rose-600">*</span>
-          </label>
-          <input type="password" id="login-password" required placeholder="••••••••" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none transition" />
+          <label for="login-password" class="block text-sm font-semibold text-slate-700 mb-1">Contraseña *</label>
+          <input
+            id="login-password"
+            type="password"
+            required
+            placeholder="Ingresa tu contraseña"
+            class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none"
+          />
         </div>
 
-        <button type="submit" class="w-full bg-teal-700 hover:bg-teal-800 text-white font-semibold py-3 rounded-xl text-sm cursor-pointer">
-          Ingresar a mi interfaz
+        <button
+          type="submit"
+          class="w-full bg-teal-700 hover:bg-teal-800 text-white font-semibold py-2.5 px-4 rounded-xl text-sm cursor-pointer"
+        >
+          Entrar
         </button>
-
-        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1.5">
-          <p class="font-bold text-slate-700">Cuentas de prueba precargadas:</p>
-          <p><span class="font-semibold">Médico (Medicina General):</span> Doc <span class="font-mono">20000001</span> · Clave <span class="font-mono">Medico2026*</span></p>
-          <p><span class="font-semibold">Administrador:</span> Doc <span class="font-mono">10000001</span> · Clave <span class="font-mono">Admin2026*</span></p>
-          <p class="text-slate-400">¿Eres paciente nuevo? Usa la pestaña "Registrar paciente".</p>
-        </div>
       </form>
 
-      <!-- FORMULARIO REGISTRO PACIENTE -->
-      <form id="form-register" novalidate class="hidden space-y-4">
+      <form id="form-register" class="hidden space-y-4">
         <div>
-          <label for="reg-nombre" class="block text-sm font-semibold text-slate-700 mb-1">
-            Nombre completo <span class="text-rose-600">*</span>
-          </label>
-          <input type="text" id="reg-nombre" required maxlength="120" placeholder="Ej. Camila Andrea Rojas" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none" />
+          <label for="reg-nombre" class="block text-sm font-semibold text-slate-700 mb-1">Nombre completo *</label>
+          <input
+            id="reg-nombre"
+            type="text"
+            required
+            placeholder="Ej. Camila Rojas"
+            class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none"
+          />
         </div>
 
         <div>
-          <label for="reg-documento" class="block text-sm font-semibold text-slate-700 mb-1">
-            Número de documento (6 a 15 dígitos) <span class="text-rose-600">*</span>
-          </label>
-          <input type="text" id="reg-documento" required inputmode="numeric" maxlength="15" placeholder="Ej. 1090123456" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none" />
+          <label for="reg-documento" class="block text-sm font-semibold text-slate-700 mb-1">Documento de identidad *</label>
+          <input
+            id="reg-documento"
+            type="text"
+            required
+            placeholder="6 a 15 dígitos"
+            class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none"
+          />
         </div>
 
         <div>
-          <label for="reg-telefono" class="block text-sm font-semibold text-slate-700 mb-1">
-            Teléfono de contacto <span class="text-rose-600">*</span>
-          </label>
-          <input type="tel" id="reg-telefono" required maxlength="20" placeholder="Ej. 3112345678" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none" />
+          <label for="reg-telefono" class="block text-sm font-semibold text-slate-700 mb-1">Teléfono de contacto *</label>
+          <input
+            id="reg-telefono"
+            type="text"
+            required
+            placeholder="Ej. 3054543612"
+            class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none"
+          />
         </div>
 
         <div>
-          <label for="reg-password" class="block text-sm font-semibold text-slate-700 mb-1">
-            Contraseña segura <span class="text-rose-600">*</span>
-          </label>
-          <input type="password" id="reg-password" required minlength="8" placeholder="Mín. 8 caracteres, mayúscula, minúscula, número y símbolo" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none" />
+          <label for="reg-password" class="block text-sm font-semibold text-slate-700 mb-1">Contraseña *</label>
+          <input
+            id="reg-password"
+            type="password"
+            required
+            placeholder="Mín. 8 caracteres, mayús, minús, número y símbolo"
+            class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none"
+          />
         </div>
 
-        <button type="submit" class="w-full bg-teal-700 hover:bg-teal-800 text-white font-semibold py-3 rounded-xl text-sm cursor-pointer">
+        <button
+          type="submit"
+          class="w-full bg-teal-700 hover:bg-teal-800 text-white font-semibold py-2.5 px-4 rounded-xl text-sm cursor-pointer"
+        >
           Crear cuenta de paciente
         </button>
       </form>
     </section>
 
-    <!-- INTERFAZ PACIENTE 1: AGENDAR CITA -->
-    <section id="vista-agendar" class="hidden vista-animada bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+    <!-- Vista Paciente: Agendar Cita -->
+    <section id="vista-agendar" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 vista-animada">
       <div class="border-b border-slate-100 pb-4 mb-6">
-        <h2 class="text-xl font-bold text-slate-900">Programar cita médica</h2>
-        <p class="text-sm text-slate-500 mt-1">
-          Selecciona especialidad, fecha y un bloque horario disponible.
-        </p>
+        <h2 class="text-2xl font-bold text-slate-900">Programar cita médica</h2>
+        <p class="text-sm text-slate-500 mt-1">Selecciona especialidad, fecha y un bloque horario disponible.</p>
       </div>
 
-      <form id="form-agendar" novalidate class="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div>
-          <label for="ag-especialidad" class="block text-sm font-semibold text-slate-700 mb-1.5">
-            Especialidad médica <span class="text-rose-600">*</span>
-          </label>
-          <select id="ag-especialidad" required class="select-anim w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none">
-            <option value="">Selecciona una especialidad</option>
-          </select>
-        </div>
-
-        <div>
-          <label for="ag-fecha" class="block text-sm font-semibold text-slate-700 mb-1.5">
-            Fecha de atención <span class="text-rose-600">*</span>
-          </label>
-          <input type="date" id="ag-fecha" required class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none" />
-          <p id="ag-rango-info" class="text-xs text-slate-400 mt-1"></p>
-        </div>
-
-        <div class="md:col-span-2">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-semibold text-slate-700">
-              Bloques horarios <span class="text-rose-600">*</span>
-            </span>
-            <span id="ag-resumen-cupos" class="text-xs text-slate-500"></span>
+      <form id="form-agendar" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label for="ag-especialidad" class="block text-sm font-semibold text-slate-700 mb-1">Especialidad médica *</label>
+            <select
+              id="ag-especialidad"
+              required
+              class="select-anim w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none"
+            >
+              <option value="">Selecciona una especialidad</option>
+            </select>
           </div>
-          <div id="grid-horarios" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5"></div>
-          <input type="hidden" id="ag-hora" />
+
+          <div>
+            <label for="ag-fecha" class="block text-sm font-semibold text-slate-700 mb-1">Fecha de atención *</label>
+            <input
+              id="ag-fecha"
+              type="date"
+              required
+              class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none"
+            />
+            <p id="ag-rango-info" class="text-xs text-slate-400 mt-1"></p>
+          </div>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Paciente</label>
-          <input type="text" id="ag-nombre-readonly" readonly class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700" />
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-semibold text-slate-700">Bloques horarios *</span>
+            <span id="ag-resumen-cupos" class="text-xs font-medium text-slate-500">Selecciona especialidad y fecha</span>
+          </div>
+          <div id="grid-horarios" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
+          <input id="ag-hora" type="hidden" required />
         </div>
 
-        <div>
-          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Documento y teléfono</label>
-          <input type="text" id="ag-doc-readonly" readonly class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700" />
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+          <div>
+            <label for="ag-nombre-readonly" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Paciente</label>
+            <input
+              id="ag-nombre-readonly"
+              type="text"
+              readonly
+              class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700"
+            />
+          </div>
+
+          <div>
+            <label for="ag-doc-readonly" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Documento y teléfono</label>
+            <input
+              id="ag-doc-readonly"
+              type="text"
+              readonly
+              class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700"
+            />
+          </div>
         </div>
 
-        <div class="md:col-span-2 pt-2 flex flex-wrap items-center justify-between gap-3">
-          <span class="text-xs text-slate-500">
-            Restricción activa: máximo una cita activa por especialidad, fecha y hora.
-          </span>
-          <button type="submit" class="bg-teal-700 hover:bg-teal-800 text-white font-semibold px-6 py-3 rounded-xl text-sm cursor-pointer">
+        <div class="flex justify-end">
+          <button
+            type="submit"
+            class="bg-teal-700 hover:bg-teal-800 text-white font-semibold px-6 py-2.5 rounded-xl text-sm cursor-pointer"
+          >
             Registrar cita
           </button>
         </div>
       </form>
 
-      <div id="comprobante-box" class="hidden mt-6 p-5 rounded-2xl bg-teal-50 border border-teal-200 vista-animada">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <span class="text-xs font-bold uppercase tracking-wider text-teal-800">Comprobante de registro</span>
-          <span id="comp-estado" class="badge badge--pendiente"></span>
+      <div id="comprobante-box" class="hidden mt-8 p-5 rounded-2xl border border-emerald-200 bg-emerald-50/70 vista-animada">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-emerald-800">Comprobante de cita</span>
+          <span id="comp-estado" class="badge"></span>
         </div>
-        <p id="comp-codigo" class="text-2xl font-mono font-bold text-teal-950 mt-2"></p>
-        <p id="comp-detalle" class="text-sm text-slate-700 mt-1.5"></p>
+        <p id="comp-codigo" class="font-mono text-lg font-bold text-slate-900"></p>
+        <p id="comp-detalle" class="text-sm text-slate-700 mt-1"></p>
       </div>
     </section>
 
-    <!-- INTERFAZ PACIENTE 2: MIS CITAS Y TRAZABILIDAD -->
-    <section id="vista-consultar" class="hidden vista-animada bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+    <!-- Vista Paciente: Mis Citas -->
+    <section id="vista-consultar" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 vista-animada">
       <div class="border-b border-slate-100 pb-4 mb-6">
-        <h2 class="text-xl font-bold text-slate-900">Mis citas y trazabilidad</h2>
-        <p class="text-sm text-slate-500 mt-1">
-          Consulta tus citas programadas, su historial y cancélalas para liberar el horario.
-        </p>
+        <h2 class="text-2xl font-bold text-slate-900">Mis citas y trazabilidad</h2>
+        <p class="text-sm text-slate-500 mt-1">Consulta tus citas programadas, su historial y cancelalas para liberar el horario.</p>
       </div>
       <div id="mis-citas-lista" class="space-y-4"></div>
     </section>
 
-    <!-- INTERFAZ MÉDICO: AGENDA DE CONSULTA -->
-    <section id="vista-medico" class="hidden vista-animada bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+    <!-- Vista Médico: Agenda Médica -->
+    <section id="vista-medico" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 vista-animada">
       <div class="border-b border-slate-100 pb-4 mb-6">
-        <h2 class="text-xl font-bold text-slate-900">Agenda médica</h2>
-        <p id="medico-subtitulo" class="text-sm text-slate-500 mt-1">
-          Revisa las citas asignadas a tu especialidad y registra su atención.
-        </p>
+        <h2 class="text-2xl font-bold text-slate-900">Agenda médica</h2>
+        <p id="medico-subtitulo" class="text-sm text-slate-500 mt-1"></p>
       </div>
       <div id="medico-citas-lista" class="space-y-4"></div>
     </section>
 
-    <!-- INTERFAZ ADMINISTRADOR: PANEL DE GESTIÓN -->
-    <section id="vista-admin" class="hidden vista-animada bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+    <!-- Vista Administrador: Panel Administrativo -->
+    <section id="vista-admin" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 vista-animada">
       <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-6">
         <div>
-          <h2 class="text-xl font-bold text-slate-900">Panel de gestión y control de estados</h2>
-          <p class="text-sm text-slate-500 mt-1">
-            Supervisa todas las citas, filtra por estado y aplica transiciones válidas.
-          </p>
+          <h2 class="text-2xl font-bold text-slate-900">Panel administrativo</h2>
+          <p class="text-sm text-slate-500 mt-1">Supervisa métricas y actualiza el estado de las citas.</p>
         </div>
+
         <div class="flex items-center gap-2">
-          <label for="filtro-estado" class="text-xs font-semibold text-slate-600">Estado:</label>
-          <select id="filtro-estado" class="select-anim rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium">
+          <label for="filtro-estado" class="text-sm font-medium text-slate-600">Estado:</label>
+          <select
+            id="filtro-estado"
+            class="select-anim rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-teal-600 focus:outline-none"
+          >
             <option value="TODOS">Todos</option>
             <option value="Pendiente">Pendiente</option>
             <option value="Confirmada">Confirmada</option>
@@ -257,27 +314,27 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6" id="metricas-admin"></div>
+      <div id="metricas-admin" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6"></div>
 
       <div class="overflow-x-auto rounded-xl border border-slate-200">
         <table class="w-full text-left border-collapse text-sm">
-          <thead>
-            <tr class="bg-slate-100 text-slate-700 border-b border-slate-200 text-xs uppercase">
+          <thead class="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
+            <tr>
               <th class="p-3">Código</th>
               <th class="p-3">Paciente</th>
               <th class="p-3">Especialidad</th>
-              <th class="p-3">Fecha y Hora</th>
+              <th class="p-3">Fecha y hora</th>
               <th class="p-3">Estado</th>
-              <th class="p-3">Acción permitida</th>
+              <th class="p-3">Acción</th>
             </tr>
           </thead>
-          <tbody id="admin-tabla-cuerpo" class="divide-y divide-slate-100"></tbody>
+          <tbody id="admin-tabla-cuerpo" class="divide-y divide-slate-100 bg-white"></tbody>
         </table>
       </div>
     </section>
   </main>
 
-  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+  <footer class="py-6 text-center text-xs text-slate-400">
     MediSys · Acceso por rol (Paciente, Médico, Administrador), hash SHA-256 y trazabilidad · Datos ficticios para pruebas.
   </footer>
 
