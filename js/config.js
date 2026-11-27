@@ -1,8 +1,18 @@
-/**
- * Configuración central y reglas de dominio de MediSys.
- */
+
 const MEDISYS_CONFIG = Object.freeze({
-  STORAGE_KEY: "medisys_citas_v1",
+  STORAGE_KEY: "medisys_citas_v2",
+  USERS_STORAGE_KEY: "medisys_users_v2",
+  SESSION_STORAGE_KEY: "medisys_session_v2",
+  LOCKOUT_STORAGE_KEY: "medisys_lockout_v2",
+
+  ROLES: Object.freeze({
+    PACIENTE: "PACIENTE",
+    ADMIN: "ADMIN"
+  }),
+
+  MAX_LOGIN_ATTEMPTS: 5,
+  LOCKOUT_MINUTES: 5,
+
   CODE_PREFIX: "MED-",
   CODE_LENGTH: 8,
   MAX_DAYS_AHEAD: 60,
@@ -39,10 +49,8 @@ const MEDISYS_CONFIG = Object.freeze({
     CANCELADA: "Cancelada"
   }),
 
-  // Estados que bloquean el horario para otra cita
   ESTADOS_ACTIVOS: Object.freeze(["Pendiente", "Confirmada"]),
 
-  // Máquina de estados permitida
   TRANSICIONES_PERMITIDAS: Object.freeze({
     Pendiente: ["Confirmada", "Cancelada"],
     Confirmada: ["Atendida", "Cancelada"],
