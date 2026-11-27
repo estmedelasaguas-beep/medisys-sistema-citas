@@ -1,180 +1,159 @@
-/**
- * Módulo de Autenticación, Cifrado SHA-256, Control de Roles (RBAC)
- * y Protección contra Fuerza Bruta para MediSys.
- */
 const MediSysAuth = (() => {
-  async function hashPassword(plainText, salt = "MEDISYS_SALT_2026") {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(`${salt}:${plainText}`);
-    const hashBuffer = await window.crypto.subtle.digest("SHA-256", data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  const KEYS = {
+    USERS: "medisys_users_roles_v1",
+    SESSION: "medisys_session_roles_v1",
+    LOCK: "medisys_lock_roles_v1"
+  };
+  const MAX_ATTEMPTS = 5;
+  const LOCK_MS = 5 * 60 * 1000;
+
+  async function hashPassword(plain) {
+    const buf = await window.crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode("MEDISYS_ROLES_2026:" + plain)
+    );
+    return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
   }
 
-  function loadUsers() {
+  function readJSON(key, fallback) {
     try {
-      const raw = localStorage.getItem(MEDISYS_CONFIG.USERS_STORAGE_KEY);
-      const list = raw ? JSON.parse(raw) : [];
-      return Array.isArray(list) ? list : [];
+      const val = JSON.parse(localStorage.getItem(key));
+      return val ?? fallback;
     } catch {
-      return [];
+      return fallback;
     }
   }
 
-  function saveUsers(users) {
-    localStorage.setItem(MEDISYS_CONFIG.USERS_STORAGE_KEY, JSON.stringify(users));
+  function writeJSON(key, val) {
+    localStorage.setItem(key, JSON.stringify(val));
   }
 
-  async function ensureDefaultAdmin() {
-    const users = loadUsers();
-    const exists = users.some((u) => u.role === MEDISYS_CONFIG.ROLES.ADMIN);
-    if (!exists) {
-      const passwordHash = await hashPassword("Admin2026*");
+  async function ensureSeedUsers() {
+    const users = readJSON(KEYS.USERS, []);
+    let changed = false;
+
+    if (!users.some((u) => u.documento === "10000001" && u.role === "ADMIN")) {
       users.push({
-        id: "USR-ADMIN-001",
-        identificador: "admin@medisys.local",
-        documento: "00000000",
+        id: "ADM-001",
+        documento: "10000001",
         nombre: "Administrador MediSys",
-        telefono: "3000000000",
-        role: MEDISYS_CONFIG.ROLES.ADMIN,
-        passwordHash,
-        creadoEn: new Date().toISOString()
+        telefono: "3000000001",
+        role: "ADMIN",
+        especialidadId: null,
+        passwordHash: await hashPassword("Admin2026*")
       });
-      saveUsers(users);
+      changed = true;
     }
-  }
 
-  function getLockoutState() {
-    try {
-      const raw = localStorage.getItem(MEDISYS_CONFIG.LOCKOUT_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : { attempts: 0, lockedUntil: 0 };
-    } catch {
-      return { attempts: 0, lockedUntil: 0 };
+    if (!users.some((u) => u.documento === "20000001" && u.role === "MEDICO")) {
+      users.push({
+        id: "MED-001",
+        documento: "20000001",
+        nombre: "Dr. Carlos Mendoza",
+        telefono: "3000000002",
+        role: "MEDICO",
+        especialidadId: "ESP-MG",
+        especialidadNombre: "Medicina General",
+        passwordHash: await hashPassword("Medico2026*")
+      });
+      changed = true;
     }
-  }
 
-  function setLockoutState(state) {
-    localStorage.setItem(MEDISYS_CONFIG.LOCKOUT_STORAGE_KEY, JSON.stringify(state));
+    if (changed) writeJSON(KEYS.USERS, users);
   }
 
   function getSession() {
     try {
-      const raw = sessionStorage.getItem(MEDISYS_CONFIG.SESSION_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : null;
+      return JSON.parse(sessionStorage.getItem(KEYS.SESSION)) || null;
     } catch {
       return null;
     }
   }
 
-  function createSession(user) {
+  function setSession(user) {
     const session = {
       userId: user.id,
-      identificador: user.identificador,
       documento: user.documento,
       nombre: user.nombre,
       telefono: user.telefono,
       role: user.role,
-      loginAt: new Date().toISOString()
+      especialidadId: user.especialidadId || null,
+      especialidadNombre: user.especialidadNombre || null
     };
-    sessionStorage.setItem(MEDISYS_CONFIG.SESSION_STORAGE_KEY, JSON.stringify(session));
+    sessionStorage.setItem(KEYS.SESSION, JSON.stringify(session));
     return session;
   }
 
   function logout() {
-    sessionStorage.removeItem(MEDISYS_CONFIG.SESSION_STORAGE_KEY);
+    sessionStorage.removeItem(KEYS.SESSION);
   }
 
-  async function registerPaciente(rawPayload) {
-    await ensureDefaultAdmin();
-    const check = MediSysValidators.validateRegisterPayload(rawPayload);
+  async function registerPaciente(raw) {
+    await ensureSeedUsers();
+    const check = MediSysValidators.validateRegisterPayload(raw);
     if (!check.valid) return { ok: false, error: check.error };
 
     const { nombre, documento, telefono, password } = check.data;
-    const users = loadUsers();
-
-    // Restricción UNIQUE sobre documento de identidad
-    const duplicate = users.some((u) => u.documento === documento || u.identificador === documento);
-    if (duplicate) {
-      return {
-        ok: false,
-        error: `Ya existe una cuenta registrada con el documento ${documento}. Inicia sesión.`
-      };
+    const users = readJSON(KEYS.USERS, []);
+    if (users.some((u) => u.documento === documento)) {
+      return { ok: false, error: `Ya existe un usuario registrado con el documento ${documento}.` };
     }
 
-    const passwordHash = await hashPassword(password);
-    const newUser = {
-      id: `USR-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      identificador: documento,
+    const user = {
+      id: "PAC-" + Date.now(),
       documento,
       nombre,
       telefono,
-      role: MEDISYS_CONFIG.ROLES.PACIENTE,
-      passwordHash,
-      creadoEn: new Date().toISOString()
+      role: "PACIENTE",
+      especialidadId: null,
+      passwordHash: await hashPassword(password)
     };
-
-    users.push(newUser);
-    saveUsers(users);
-
-    const session = createSession(newUser);
-    return { ok: true, session };
+    users.push(user);
+    writeJSON(KEYS.USERS, users);
+    return { ok: true, session: setSession(user) };
   }
 
-  async function login(identificadorRaw, passwordRaw) {
-    await ensureDefaultAdmin();
-
-    const lock = getLockoutState();
+  async function login(roleRaw, documentoRaw, passwordRaw) {
+    await ensureSeedUsers();
+    const lock = readJSON(KEYS.LOCK, { attempts: 0, lockedUntil: 0 });
     const now = Date.now();
+
     if (lock.lockedUntil && now < lock.lockedUntil) {
-      const minsLeft = Math.ceil((lock.lockedUntil - now) / 60000);
-      return {
-        ok: false,
-        error: `Acceso bloqueado temporalmente por seguridad. Intenta nuevamente en ${minsLeft} minuto(s).`
-      };
+      const mins = Math.ceil((lock.lockedUntil - now) / 60000);
+      return { ok: false, error: `Acceso bloqueado por seguridad. Intenta en ${mins} min.` };
     }
 
-    const identificador = MediSysValidators.sanitizeText(identificadorRaw || "").toLowerCase();
-    const password = typeof passwordRaw === "string" ? passwordRaw : "";
+    const role = MediSysValidators.sanitizeText(roleRaw || "").toUpperCase();
+    const doc = MediSysValidators.normalizeDocument(documentoRaw || "");
+    const pass = typeof passwordRaw === "string" ? passwordRaw : "";
 
-    if (!identificador || !password) {
-      return { ok: false, error: "Ingresa tu identificador y contraseña." };
+    if (!["PACIENTE", "MEDICO", "ADMIN"].includes(role)) {
+      return { ok: false, error: "Selecciona un rol válido (Paciente, Médico o Administrador)." };
+    }
+    if (!doc || !pass) {
+      return { ok: false, error: "Ingresa tu número de documento y contraseña." };
     }
 
-    const users = loadUsers();
-    const user = users.find(
-      (u) => u.identificador.toLowerCase() === identificador || u.documento === identificador
-    );
+    const users = readJSON(KEYS.USERS, []);
+    const user = users.find((u) => u.documento === doc && u.role === role);
+    const hash = await hashPassword(pass);
 
-    const inputHash = await hashPassword(password);
-    if (!user || user.passwordHash !== inputHash) {
-      const nextAttempts = (lock.attempts || 0) + 1;
-      if (nextAttempts >= MEDISYS_CONFIG.MAX_LOGIN_ATTEMPTS) {
-        setLockoutState({
-          attempts: 0,
-          lockedUntil: now + MEDISYS_CONFIG.LOCKOUT_MINUTES * 60 * 1000
-        });
-        return {
-          ok: false,
-          error: `Demasiados intentos fallidos. Cuenta bloqueada por ${MEDISYS_CONFIG.LOCKOUT_MINUTES} minutos.`
-        };
+    if (!user || user.passwordHash !== hash) {
+      const attempts = (lock.attempts || 0) + 1;
+      if (attempts >= MAX_ATTEMPTS) {
+        writeJSON(KEYS.LOCK, { attempts: 0, lockedUntil: now + LOCK_MS });
+        return { ok: false, error: "Demasiados intentos fallidos. Bloqueado por 5 minutos." };
       }
-      setLockoutState({ attempts: nextAttempts, lockedUntil: 0 });
+      writeJSON(KEYS.LOCK, { attempts, lockedUntil: 0 });
       return {
         ok: false,
-        error: `Credenciales incorrectas (intento ${nextAttempts} de ${MEDISYS_CONFIG.MAX_LOGIN_ATTEMPTS}).`
+        error: `Documento, rol o contraseña incorrectos (intento ${attempts} de ${MAX_ATTEMPTS}).`
       };
     }
 
-    setLockoutState({ attempts: 0, lockedUntil: 0 });
-    const session = createSession(user);
-    return { ok: true, session };
+    writeJSON(KEYS.LOCK, { attempts: 0, lockedUntil: 0 });
+    return { ok: true, session: setSession(user) };
   }
 
-  return {
-    ensureDefaultAdmin,
-    getSession,
-    logout,
-    registerPaciente,
-    login
-  };
+  return { ensureSeedUsers, getSession, logout, registerPaciente, login };
 })();
