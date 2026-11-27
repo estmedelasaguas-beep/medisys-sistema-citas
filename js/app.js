@@ -1,4 +1,6 @@
 (() => {
+  let alertTimeout = null;
+
   const els = {
     banner: document.getElementById("banner-alerta"),
     headerSessionBar: document.getElementById("header-session-bar"),
@@ -52,17 +54,34 @@
 
   function showAlert(message, type = "info") {
     if (!els.banner) return;
-    els.banner.className = "mb-6 p-4 rounded-xl border text-sm font-medium vista-animada " + (
-      type === "error" ? "bg-rose-50 border-rose-200 text-rose-800" :
-      type === "success" ? "bg-emerald-50 border-emerald-200 text-emerald-800" :
-      "bg-sky-50 border-sky-200 text-sky-800"
-    );
+    if (alertTimeout) clearTimeout(alertTimeout);
+
+    els.banner.classList.remove("hidden", "vista-salida");
+    els.banner.className =
+      "mb-6 p-4 rounded-xl border text-sm font-medium vista-animada " +
+      (type === "error"
+        ? "bg-rose-50 border-rose-200 text-rose-800"
+        : type === "success"
+        ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+        : "bg-sky-50 border-sky-200 text-sky-800");
+
     els.banner.textContent = message;
-    els.banner.classList.remove("hidden");
+
+    alertTimeout = setTimeout(() => {
+      hideAlert();
+    }, 4500);
   }
 
   function hideAlert() {
-    if (els.banner) els.banner.classList.add("hidden");
+    if (!els.banner || els.banner.classList.contains("hidden")) return;
+    els.banner.classList.remove("vista-animada");
+    els.banner.classList.add("vista-salida");
+    setTimeout(() => {
+      if (els.banner.classList.contains("vista-salida")) {
+        els.banner.classList.add("hidden");
+        els.banner.classList.remove("vista-salida");
+      }
+    }, 220);
   }
 
   function applyBadge(badgeEl, estado) {
@@ -284,7 +303,7 @@
       if (cita.estado === "Confirmada" || cita.estado === "Pendiente") {
         const btnAtender = document.createElement("button");
         btnAtender.type = "button";
-        btnAtender.textContent = "Marcar como Atendida";
+        btnAtender.textContent = cita.estado === "Pendiente" ? "Confirmar cita" : "Marcar Atendida";
         btnAtender.className = "bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg cursor-pointer";
         btnAtender.addEventListener("click", () => {
           const targetState = cita.estado === "Pendiente" ? "Confirmada" : "Atendida";
@@ -298,7 +317,6 @@
           showAlert(`Cita ${cita.codigo} actualizada a ${targetState}.`, "success");
           renderMedico();
         });
-        btnAtender.textContent = cita.estado === "Pendiente" ? "Confirmar cita" : "Marcar Atendida";
         card.appendChild(btnAtender);
       }
 
@@ -415,16 +433,22 @@
       e.preventDefault();
       hideAlert();
       const session = MediSysAuth.getSession();
-      if (!session) return syncUIWithSession();
+      if (!session || session.role !== "PACIENTE") {
+        showAlert("Debes iniciar sesión como paciente para agendar una cita.", "error");
+        return syncUIWithSession();
+      }
 
-      const res = MediSysStore.createCita({
-        especialidadId: els.selEspecialidad.value,
-        fecha: els.inputFecha.value,
-        hora: els.inputHora.value,
-        nombrePaciente: session.nombre,
-        documento: session.documento,
-        telefono: session.telefono
-      });
+      const res = MediSysStore.createCita(
+        {
+          especialidadId: els.selEspecialidad.value,
+          fecha: els.inputFecha.value,
+          hora: els.inputHora.value,
+          nombrePaciente: session.nombre,
+          documento: session.documento,
+          telefono: session.telefono
+        },
+        session
+      );
 
       if (!res.ok) return showAlert(res.error, "error");
       const { cita } = res;
