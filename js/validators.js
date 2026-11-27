@@ -1,89 +1,65 @@
-/**
- * Validaciones de integridad, credenciales y sanitización anti-XSS para MediSys.
- */
 const MediSysValidators = (() => {
   function sanitizeText(value) {
-    if (typeof value !== "string") return "";
-    return value
-      .replace(/<[^>]*>/g, "")
-      .replace(/[\u0000-\u001F\u007F]/g, "")
+    return String(value ?? "")
+      .replace(/[<>]/g, "")
       .replace(/\s+/g, " ")
       .trim();
   }
 
-  function normalizeDocument(value) {
-    return sanitizeText(value).replace(/\D/g, "");
-  }
-
-  function normalizePhone(value) {
-    return sanitizeText(value).replace(/[^0-9+]/g, "");
+  function normalizeDocument(doc) {
+    return String(doc ?? "").replace(/\D+/g, "").trim();
   }
 
   function getTodayISO() {
     const now = new Date();
-    const offsetMs = now.getTimezoneOffset() * 60000;
-    return new Date(now.getTime() - offsetMs).toISOString().split("T")[0];
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   }
 
-  function addDaysISO(baseDateISO, days) {
-    const [y, m, d] = baseDateISO.split("-").map(Number);
-    const dt = new Date(Date.UTC(y, m - 1, d + days));
-    return dt.toISOString().split("T")[0];
+  function addDaysISO(isoDate, days) {
+    const [y, m, d] = isoDate.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + Number(days || 0));
+    const year = dt.getFullYear();
+    const month = String(dt.getMonth() + 1).padStart(2, "0");
+    const day = String(dt.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   }
 
-  function validatePasswordStrength(password) {
-    if (typeof password !== "string" || password.length < 8 || password.length > 64) {
-      return { valid: false, error: "La contraseña debe tener entre 8 y 64 caracteres." };
-    }
-    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
-      return {
-        valid: false,
-        error: "La contraseña debe incluir al menos una mayúscula, una minúscula, un número y un símbolo."
-      };
-    }
-    return { valid: true };
+  function canTransition(currentState, nextState) {
+    const allowed = MEDISYS_CONFIG.TRANSICIONES_PERMITIDAS[currentState] || [];
+    return allowed.includes(nextState);
   }
 
   function validateRegisterPayload(raw) {
-    const nombre = sanitizeText(raw.nombre || "");
-    const documento = normalizeDocument(raw.documento || "");
-    const telefono = normalizePhone(raw.telefono || "");
-    const password = typeof raw.password === "string" ? raw.password : "";
+    const nombre = sanitizeText(raw?.nombre || "");
+    const documento = normalizeDocument(raw?.documento || "");
+    const telefono = sanitizeText(raw?.telefono || "");
+    const password = typeof raw?.password === "string" ? raw.password : "";
 
+    if (nombre.length < 3 || nombre.length > 120) {
+      return { valid: false, error: "El nombre completo debe tener entre 3 y 120 caracteres." };
+    }
+    if (!/^\d{6,15}$/.test(documento)) {
+      return { valid: false, error: "El número de documento debe tener entre 6 y 15 dígitos." };
+    }
+    if (!/^[0-9+\-\s()]{7,20}$/.test(telefono)) {
+      return { valid: false, error: "Ingresa un teléfono de contacto válido (7 a 20 caracteres)." };
+    }
     if (
-      nombre.length < MEDISYS_CONFIG.MIN_NAME_LENGTH ||
-      nombre.length > MEDISYS_CONFIG.MAX_NAME_LENGTH ||
-      !/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]+$/.test(nombre)
+      password.length < 8 ||
+      !/[A-Z]/.test(password) ||
+      !/[a-z]/.test(password) ||
+      !/\d/.test(password) ||
+      !/[^A-Za-z0-9]/.test(password)
     ) {
       return {
         valid: false,
-        error: "Ingresa un nombre válido (solo letras y espacios, entre 4 y 120 caracteres)."
+        error: "La contraseña debe tener mínimo 8 caracteres, mayúscula, minúscula, número y símbolo."
       };
     }
-
-    if (
-      documento.length < MEDISYS_CONFIG.MIN_DOC_DIGITS ||
-      documento.length > MEDISYS_CONFIG.MAX_DOC_DIGITS
-    ) {
-      return {
-        valid: false,
-        error: `El documento debe tener entre ${MEDISYS_CONFIG.MIN_DOC_DIGITS} y ${MEDISYS_CONFIG.MAX_DOC_DIGITS} dígitos.`
-      };
-    }
-
-    const phoneDigits = telefono.replace(/\D/g, "");
-    if (
-      phoneDigits.length < MEDISYS_CONFIG.MIN_PHONE_DIGITS ||
-      phoneDigits.length > MEDISYS_CONFIG.MAX_PHONE_DIGITS
-    ) {
-      return {
-        valid: false,
-        error: `Ingresa un teléfono válido de ${MEDISYS_CONFIG.MIN_PHONE_DIGITS} a ${MEDISYS_CONFIG.MAX_PHONE_DIGITS} dígitos.`
-      };
-    }
-
-    const passCheck = validatePasswordStrength(password);
-    if (!passCheck.valid) return passCheck;
 
     return {
       valid: true,
@@ -91,63 +67,61 @@ const MediSysValidators = (() => {
     };
   }
 
-  function validateDateRange(fechaISO) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaISO)) {
-      return { valid: false, error: "La fecha debe tener formato válido (AAAA-MM-DD)." };
-    }
-    const minDate = getTodayISO();
-    const maxDate = addDaysISO(minDate, MEDISYS_CONFIG.MAX_DAYS_AHEAD);
-
-    if (fechaISO < minDate) {
-      return { valid: false, error: "No se pueden agendar citas en fechas pasadas." };
-    }
-    if (fechaISO > maxDate) {
-      return {
-        valid: false,
-        error: `Solo se permiten reservas hasta ${maxDate} (${MEDISYS_CONFIG.MAX_DAYS_AHEAD} días de anticipación).`
-      };
-    }
-    return { valid: true };
-  }
-
-  function validateCitaPayload(raw, sessionUser) {
-    if (!sessionUser || sessionUser.role !== MEDISYS_CONFIG.ROLES.PACIENTE) {
+  function validateCitaPayload(payload, sessionUser) {
+    if (!sessionUser || sessionUser.role !== "PACIENTE" || !sessionUser.documento) {
       return { valid: false, error: "Debes iniciar sesión como paciente para agendar una cita." };
     }
 
-    const especialidadId = sanitizeText(raw.especialidadId || "");
-    const fecha = sanitizeText(raw.fecha || "");
-    const hora = sanitizeText(raw.hora || "");
-
-    const especialidad = MEDISYS_CONFIG.ESPECIALIDADES.find((e) => e.id === especialidadId);
-    if (!especialidad) {
+    const espId = sanitizeText(payload?.especialidadId || "");
+    const esp = MEDISYS_CONFIG.ESPECIALIDADES.find((e) => e.id === espId);
+    if (!esp) {
       return { valid: false, error: "Selecciona una especialidad médica válida." };
     }
 
-    const dateCheck = validateDateRange(fecha);
-    if (!dateCheck.valid) return dateCheck;
+    const fecha = sanitizeText(payload?.fecha || "");
+    const hoy = getTodayISO();
+    const maxFecha = addDaysISO(hoy, MEDISYS_CONFIG.MAX_DAYS_AHEAD);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || fecha < hoy || fecha > maxFecha) {
+      return {
+        valid: false,
+        error: `La fecha debe estar entre ${hoy} y ${maxFecha}.`
+      };
+    }
 
+    const hora = sanitizeText(payload?.hora || "");
     if (!MEDISYS_CONFIG.BLOQUES_HORARIOS.includes(hora)) {
-      return { valid: false, error: "Selecciona un bloque horario disponible." };
+      return { valid: false, error: "Selecciona un bloque horario válido." };
+    }
+
+    const documento = normalizeDocument(sessionUser.documento);
+    if (!/^\d{6,15}$/.test(documento)) {
+      return { valid: false, error: "El documento del paciente debe tener entre 6 y 15 dígitos." };
+    }
+
+    const nombre = sanitizeText(payload?.nombrePaciente || sessionUser.nombre || "");
+    if (nombre.length < 3 || nombre.length > 120) {
+      return { valid: false, error: "El nombre del paciente debe tener entre 3 y 120 caracteres." };
+    }
+
+    const telefono = sanitizeText(payload?.telefono || sessionUser.telefono || "");
+    if (!/^[0-9+\-\s()]{7,20}$/.test(telefono)) {
+      return { valid: false, error: "Ingresa un teléfono de contacto válido (7 a 20 caracteres)." };
     }
 
     return {
       valid: true,
       data: {
-        especialidadId: especialidad.id,
-        especialidadNombre: especialidad.nombre,
+        especialidadId: esp.id,
+        especialidadNombre: esp.nombre,
         fecha,
         hora,
-        nombrePaciente: sessionUser.nombre,
-        documento: sessionUser.documento,
-        telefono: sessionUser.telefono
+        documento,
+        paciente: {
+          nombre,
+          telefono
+        }
       }
     };
-  }
-
-  function canTransition(estadoActual, estadoNuevo) {
-    const permitidos = MEDISYS_CONFIG.TRANSICIONES_PERMITIDAS[estadoActual] || [];
-    return permitidos.includes(estadoNuevo);
   }
 
   return {
@@ -155,8 +129,8 @@ const MediSysValidators = (() => {
     normalizeDocument,
     getTodayISO,
     addDaysISO,
+    canTransition,
     validateRegisterPayload,
-    validateCitaPayload,
-    canTransition
+    validateCitaPayload
   };
 })();
