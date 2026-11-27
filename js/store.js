@@ -1,18 +1,11 @@
 /**
- * Capa de persistencia y reglas de integridad de MediSys.
- * Diseñada para reemplazarse o respaldarse fácilmente por una API conectada a base de datos.
+ * Capa de persistencia, aislamiento por sesión y reglas de integridad de MediSys.
  */
 const MediSysStore = (() => {
   function generateCode() {
     const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     const bytes = new Uint8Array(MEDISYS_CONFIG.CODE_LENGTH);
-    if (window.crypto && window.crypto.getRandomValues) {
-      window.crypto.getRandomValues(bytes);
-    } else {
-      for (let i = 0; i < bytes.length; i++) {
-        bytes[i] = Math.floor(Math.random() * 256);
-      }
-    }
+    window.crypto.getRandomValues(bytes);
     let suffix = "";
     for (let i = 0; i < bytes.length; i++) {
       suffix += alphabet[bytes[i] % alphabet.length];
@@ -23,8 +16,7 @@ const MediSysStore = (() => {
   function loadAll() {
     try {
       const raw = localStorage.getItem(MEDISYS_CONFIG.STORAGE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
+      const parsed = raw ? JSON.parse(raw) : [];
       return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
@@ -47,8 +39,7 @@ const MediSysStore = (() => {
   }
 
   function getOccupiedSlots(especialidadId, fecha) {
-    const citas = loadAll();
-    return citas
+    return loadAll()
       .filter(
         (c) =>
           c.especialidadId === especialidadId &&
@@ -58,14 +49,14 @@ const MediSysStore = (() => {
       .map((c) => c.hora);
   }
 
-  function createCita(payload) {
-    const check = MediSysValidators.validateCitaPayload(payload);
+  function createCita(payload, sessionUser) {
+    const check = MediSysValidators.validateCitaPayload(payload, sessionUser);
     if (!check.valid) return { ok: false, error: check.error };
 
     const datos = check.data;
     const citas = loadAll();
 
-    // Restricción de unicidad: no permitir dos citas activas en especialidad + fecha + hora
+    // Restricción UNIQUE: especialidad + fecha + hora activa
     const conflicto = citas.find(
       (c) =>
         c.especialidadId === datos.especialidadId &&
@@ -73,15 +64,14 @@ const MediSysStore = (() => {
         c.hora === datos.hora &&
         MEDISYS_CONFIG.ESTADOS_ACTIVOS.includes(c.estado)
     );
-
     if (conflicto) {
       return {
         ok: false,
-        error: `Conflicto de agenda: ya existe una cita activa (${conflicto.estado}) para ${datos.especialidadNombre} el ${datos.fecha} a las ${datos.hora}.`
+        error: `Conflicto de agenda: el bloque ${datos.hora} en ${datos.especialidadNombre} ya está ocupado.`
       };
     }
 
-    // Evitar que el mismo documento reserve dos horarios distintos el mismo día en la misma especialidad
+    // Restricción: un paciente no puede tener dos citas activas el mismo día en la misma especialidad
     const duplicadoPaciente = citas.find(
       (c) =>
         c.documento === datos.documento &&
@@ -89,17 +79,16 @@ const MediSysStore = (() => {
         c.fecha === datos.fecha &&
         MEDISYS_CONFIG.ESTADOS_ACTIVOS.includes(c.estado)
     );
-
     if (duplicadoPaciente) {
       return {
         ok: false,
-        error: `El documento ${datos.documento} ya tiene una cita activa en ${datos.especialidadNombre} para el día ${datos.fecha} (${duplicadoPaciente.hora}).`
+        error: `Ya tienes una cita activa en ${datos.especialidadNombre} para el ${datos.fecha} (${duplicadoPaciente.hora}).`
       };
     }
 
-    const codigosExistentes = new Set(citas.map((c) => c.codigo));
+    const existingCodes = new Set(citas.map((c) => c.codigo));
     let codigo = generateCode();
-    while (codigosExistentes.has(codigo)) {
+    while (existingCodes.has(codigo)) {
       codigo = generateCode();
     }
 
@@ -127,49 +116,43 @@ const MediSysStore = (() => {
       nuevaCita,
       null,
       MEDISYS_CONFIG.ESTADOS.PENDIENTE,
-      "Paciente",
-      "Cita registrada en MediSys"
+      `Paciente (${datos.documento})`,
+      "Solicitud registrada desde sesión autenticada"
     );
 
     citas.unshift(nuevaCita);
     saveAll(citas);
-
     return { ok: true, cita: nuevaCita };
   }
 
-  function findCita(codigoRaw, documentoRaw) {
-    const check = MediSysValidators.validateConsultaPayload({
-      codigo: codigoRaw,
-      documento: documentoRaw
-    });
-    if (!check.valid) return { ok: false, error: check.error };
-
-    const { codigo, documento } = check.data;
-    const citas = loadAll();
-    const cita = citas.find((c) => c.codigo === codigo && c.documento === documento);
-
-    if (!cita) {
-      return {
-        ok: false,
-        error: "No se encontró ninguna cita que coincida con ese código y documento."
-      };
-    }
-
-    return { ok: true, cita };
+  function listMyCitas(sessionUser) {
+    if (!sessionUser || sessionUser.role !== MEDISYS_CONFIG.ROLES.PACIENTE) return [];
+    return loadAll().filter((c) => c.documento === sessionUser.documento);
   }
 
-  function transitionState(citaId, nuevoEstado, actor, observacionRaw) {
+  function transitionState(citaId, nuevoEstado, sessionUser, observacionRaw) {
+    if (!sessionUser) return { ok: false, error: "Sesión no válida." };
+
     const citas = loadAll();
     const idx = citas.findIndex((c) => c.id === citaId);
-    if (idx === -1) return { ok: false, error: "La cita solicitada no existe." };
+    if (idx === -1) return { ok: false, error: "Cita no encontrada." };
 
     const cita = citas[idx];
-    const estadoAnterior = cita.estado;
 
-    if (!MediSysValidators.canTransition(estadoAnterior, nuevoEstado)) {
+    // Control de autorización por rol y propiedad
+    if (sessionUser.role === MEDISYS_CONFIG.ROLES.PACIENTE) {
+      if (cita.documento !== sessionUser.documento) {
+        return { ok: false, error: "No tienes permisos para modificar citas de otro paciente." };
+      }
+      if (nuevoEstado !== MEDISYS_CONFIG.ESTADOS.CANCELADA) {
+        return { ok: false, error: "Un paciente solo puede cancelar sus propias citas." };
+      }
+    }
+
+    if (!MediSysValidators.canTransition(cita.estado, nuevoEstado)) {
       return {
         ok: false,
-        error: `Transición no permitida: una cita en estado "${estadoAnterior}" no puede pasar a "${nuevoEstado}".`
+        error: `Transición inválida: "${cita.estado}" no puede pasar a "${nuevoEstado}".`
       };
     }
 
@@ -181,48 +164,42 @@ const MediSysStore = (() => {
       };
     }
 
+    const estadoAnterior = cita.estado;
+    const actor =
+      sessionUser.role === MEDISYS_CONFIG.ROLES.ADMIN
+        ? `Administrador (${sessionUser.nombre})`
+        : `Paciente (${sessionUser.documento})`;
+
     cita.estado = nuevoEstado;
     cita.actualizadoEn = new Date().toISOString();
     if (nuevoEstado === MEDISYS_CONFIG.ESTADOS.CANCELADA) {
-      cita.motivoCancelacion = observacion || "Cancelada por el usuario";
+      cita.motivoCancelacion = observacion || `Cancelada por ${actor}`;
     }
 
-    appendAudit(
-      cita,
-      estadoAnterior,
-      nuevoEstado,
-      actor,
-      observacion || `Cambio de estado a ${nuevoEstado}`
-    );
+    appendAudit(cita, estadoAnterior, nuevoEstado, actor, observacion || `Estado actualizado a ${nuevoEstado}`);
 
     citas[idx] = cita;
     saveAll(citas);
     return { ok: true, cita };
   }
 
-  function cancelByPatient(codigoRaw, documentoRaw, motivoRaw) {
-    const found = findCita(codigoRaw, documentoRaw);
-    if (!found.ok) return found;
-    return transitionState(
-      found.cita.id,
-      MEDISYS_CONFIG.ESTADOS.CANCELADA,
-      "Paciente",
-      motivoRaw || "Cancelada desde consulta del paciente"
-    );
-  }
-
-  function listCitas(estadoFiltro = "TODOS") {
-    const citas = loadAll();
-    if (!estadoFiltro || estadoFiltro === "TODOS") return citas;
-    return citas.filter((c) => c.estado === estadoFiltro);
+  function listAllForAdmin(sessionUser, estadoFiltro = "TODOS") {
+    if (!sessionUser || sessionUser.role !== MEDISYS_CONFIG.ROLES.ADMIN) {
+      return { ok: false, error: "Acceso denegado: se requiere rol Administrador.", citas: [] };
+    }
+    const todas = loadAll();
+    const filtradas =
+      !estadoFiltro || estadoFiltro === "TODOS"
+        ? todas
+        : todas.filter((c) => c.estado === estadoFiltro);
+    return { ok: true, citas: filtradas, todas };
   }
 
   return {
     getOccupiedSlots,
     createCita,
-    findCita,
+    listMyCitas,
     transitionState,
-    cancelByPatient,
-    listCitas
+    listAllForAdmin
   };
 })();
