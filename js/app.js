@@ -281,14 +281,23 @@
 
   function renderMedico() {
     const session = MediSysAuth.getSession();
-    els.medicoSubtitulo.textContent = `Especialidad asignada: ${session.especialidadNombre || "General"} · ${session.nombre}`;
-    const citas = MediSysStore.listCitas("TODOS").filter(
-      (c) => c.especialidadId === session.especialidadId && c.estado !== "Cancelada"
-    );
+    const espNombre = session.especialidadNombre || "Medicina General";
+    const espId = session.especialidadId || "ESP-MG";
+    els.medicoSubtitulo.textContent = `Especialidad asignada: ${espNombre} · ${session.nombre}`;
+
+    const citas = MediSysStore.listCitas("TODOS").filter((c) => {
+      const cEspId = String(c.especialidadId || c.especialidad || "").toLowerCase();
+      const cEspNom = String(c.especialidadNombre || "").toLowerCase();
+      const matchEsp =
+        cEspId === String(espId).toLowerCase() ||
+        cEspNom === String(espNombre).toLowerCase();
+      return matchEsp && c.estado !== "Cancelada";
+    });
+
     els.medicoCitasLista.innerHTML = "";
 
     if (!citas.length) {
-      els.medicoCitasLista.innerHTML = '<p class="text-sm text-slate-400 p-6 bg-slate-50 rounded-xl border text-center">No hay citas activas en tu agenda por ahora.</p>';
+      els.medicoCitasLista.innerHTML = `<p class="text-sm text-slate-400 p-6 bg-slate-50 rounded-xl border text-center">No hay citas activas en ${espNombre} por ahora.</p>`;
       return;
     }
 
