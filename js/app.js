@@ -290,59 +290,65 @@
     });
   }
 
-  function renderMedico() {
-    const session = MediSysAuth.getSession();
-    const espNombre = session.especialidadNombre || "Medicina General";
-    const espId = session.especialidadId || "ESP-MG";
-    els.medicoSubtitulo.textContent = `Especialidad asignada: ${espNombre} · ${session.nombre}`;
+ function renderMedico() {
+  const session = MediSysAuth.getSession();
+  const espNombre = session.especialidadNombre || "Medicina General";
+  const espId = session.especialidadId || "";
+  els.medicoSubtitulo.textContent = `Especialidad asignada: ${espNombre} · ${session.nombre}`;
 
-    const citas = MediSysStore.listCitas("TODOS").filter((c) => {
-      const cEspId = String(c.especialidadId || c.especialidad || "").toLowerCase();
-      const cEspNom = String(c.especialidadNombre || "").toLowerCase();
-      const matchEsp =
-        cEspId === String(espId).toLowerCase() ||
-        cEspNom === String(espNombre).toLowerCase();
-      return matchEsp && c.estado !== "Cancelada";
-    });
+  const norm = (v) => String(v || "").trim().toLowerCase();
+  const targetId = norm(espId);
+  const targetNom = norm(espNombre);
 
-    els.medicoCitasLista.innerHTML = "";
+  const citas = MediSysStore.listCitas("TODOS").filter((c) => {
+    if (c.estado === "Cancelada") return false;
+    const cId = norm(c.especialidadId || c.especialidad);
+    const cNom = norm(c.especialidadNombre);
+    return (
+      (targetId && cId === targetId) ||
+      (targetNom && (cNom === targetNom || cId === targetNom)) ||
+      (targetNom.includes("general") && (cNom.includes("general") || cId.includes("general")))
+    );
+  });
 
-    if (!citas.length) {
-      els.medicoCitasLista.innerHTML = `<p class="text-sm text-slate-400 p-6 bg-slate-50 rounded-xl border text-center">No hay citas activas en ${espNombre} por ahora.</p>`;
-      return;
+  els.medicoCitasLista.innerHTML = "";
+
+  if (!citas.length) {
+    els.medicoCitasLista.innerHTML = `<p class="text-sm text-slate-400 p-6 bg-slate-50 rounded-xl border text-center">No hay citas activas en ${espNombre} por ahora.</p>`;
+    return;
+  }
+
+  citas.forEach((cita) => {
+    const card = document.createElement("div");
+    card.className = "p-4 rounded-xl border border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-4";
+
+    const left = document.createElement("div");
+    left.innerHTML = `<span class="font-mono font-bold text-teal-900">${cita.codigo}</span> · <strong>${getCitaPacienteNombre(cita)}</strong> (Doc: ${getCitaDocumento(cita)}) · ${cita.fecha} ${cita.hora} — <span class="font-semibold">${cita.estado}</span>`;
+    card.appendChild(left);
+
+    if (cita.estado === "Confirmada" || cita.estado === "Pendiente") {
+      const btnAtender = document.createElement("button");
+      btnAtender.type = "button";
+      btnAtender.textContent = cita.estado === "Pendiente" ? "Confirmar cita" : "Marcar Atendida";
+      btnAtender.className = "bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg cursor-pointer";
+      btnAtender.addEventListener("click", () => {
+        const targetState = cita.estado === "Pendiente" ? "Confirmada" : "Atendida";
+        const res = MediSysStore.transitionState(
+          cita.id,
+          targetState,
+          `Médico (${session.nombre})`,
+          `Actualizada por médico a ${targetState}`
+        );
+        if (!res.ok) return showAlert(res.error, "error");
+        showAlert(`Cita ${cita.codigo} actualizada a ${targetState}.`, "success");
+        renderMedico();
+      });
+      card.appendChild(btnAtender);
     }
 
-    citas.forEach((cita) => {
-      const card = document.createElement("div");
-      card.className = "p-4 rounded-xl border border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-4";
-
-      const left = document.createElement("div");
-      left.innerHTML = `<span class="font-mono font-bold text-teal-900">${cita.codigo}</span> · <strong>${getCitaPacienteNombre(cita)}</strong> (Doc: ${getCitaDocumento(cita)}) · ${cita.fecha} ${cita.hora} — <span class="font-semibold">${cita.estado}</span>`;
-      card.appendChild(left);
-
-      if (cita.estado === "Confirmada" || cita.estado === "Pendiente") {
-        const btnAtender = document.createElement("button");
-        btnAtender.type = "button";
-        btnAtender.textContent = cita.estado === "Pendiente" ? "Confirmar cita" : "Marcar Atendida";
-        btnAtender.className = "bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg cursor-pointer";
-        btnAtender.addEventListener("click", () => {
-          const targetState = cita.estado === "Pendiente" ? "Confirmada" : "Atendida";
-          const res = MediSysStore.transitionState(
-            cita.id,
-            targetState,
-            `Médico (${session.nombre})`,
-            `Actualizada por médico a ${targetState}`
-          );
-          if (!res.ok) return showAlert(res.error, "error");
-          showAlert(`Cita ${cita.codigo} actualizada a ${targetState}.`, "success");
-          renderMedico();
-        });
-        card.appendChild(btnAtender);
-      }
-
-      els.medicoCitasLista.appendChild(card);
-    });
-  }
+    els.medicoCitasLista.appendChild(card);
+  });
+}
 
   function renderAdmin() {
     const todas = MediSysStore.listCitas("TODOS");
