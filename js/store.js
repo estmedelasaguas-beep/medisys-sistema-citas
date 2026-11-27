@@ -1,52 +1,36 @@
-/**
- * Capa de persistencia, aislamiento por sesión y reglas de integridad de MediSys.
- */
 const MediSysStore = (() => {
-  function generateCode() {
-    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    const bytes = new Uint8Array(MEDISYS_CONFIG.CODE_LENGTH);
-    window.crypto.getRandomValues(bytes);
-    let suffix = "";
-    for (let i = 0; i < bytes.length; i++) {
-      suffix += alphabet[bytes[i] % alphabet.length];
-    }
-    return `${MEDISYS_CONFIG.CODE_PREFIX}${suffix}`;
-  }
+  const STORAGE_KEY = "medisys_citas_v1";
 
   function loadAll() {
     try {
-      const raw = localStorage.getItem(MEDISYS_CONFIG.STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed : [];
+      const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      return Array.isArray(raw) ? raw : [];
     } catch {
       return [];
     }
   }
 
   function saveAll(citas) {
-    localStorage.setItem(MEDISYS_CONFIG.STORAGE_KEY, JSON.stringify(citas));
-  }
-
-  function appendAudit(cita, estadoAnterior, estadoNuevo, actor, observacion) {
-    cita.historial.push({
-      id: `TRZ-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      estadoAnterior: estadoAnterior || null,
-      estadoNuevo,
-      actor,
-      observacion,
-      timestamp: new Date().toISOString()
-    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(citas));
   }
 
   function getOccupiedSlots(especialidadId, fecha) {
-    return loadAll()
+    if (!especialidadId || !fecha) return [];
+    const citas = loadAll();
+    return citas
       .filter(
         (c) =>
-          c.especialidadId === especialidadId &&
+          String(c.especialidadId || "").toLowerCase() === String(especialidadId).toLowerCase() &&
           c.fecha === fecha &&
           MEDISYS_CONFIG.ESTADOS_ACTIVOS.includes(c.estado)
       )
       .map((c) => c.hora);
+  }
+
+  function generateCodigo(citas) {
+    const year = new Date().getFullYear();
+    const num = String((citas?.length || 0) + 1).padStart(4, "0");
+    return `MS-${year}-${num}`;
   }
 
   function createCita(payload, sessionUser) {
@@ -56,10 +40,9 @@ const MediSysStore = (() => {
     const datos = check.data;
     const citas = loadAll();
 
-    // Restricción UNIQUE: especialidad + fecha + hora activa
     const conflicto = citas.find(
       (c) =>
-        c.especialidadId === datos.especialidadId &&
+        String(c.especialidadId || "").toLowerCase() === String(datos.especialidadId).toLowerCase() &&
         c.fecha === datos.fecha &&
         c.hora === datos.hora &&
         MEDISYS_CONFIG.ESTADOS_ACTIVOS.includes(c.estado)
@@ -71,135 +54,95 @@ const MediSysStore = (() => {
       };
     }
 
-    // Restricción: un paciente no puede tener dos citas activas el mismo día en la misma especialidad
-    const duplicadoPaciente = citas.find(
-      (c) =>
-        c.documento === datos.documento &&
-        c.especialidadId === datos.especialidadId &&
-        c.fecha === datos.fecha &&
-        MEDISYS_CONFIG.ESTADOS_ACTIVOS.includes(c.estado)
-    );
-    if (duplicadoPaciente) {
-      return {
-        ok: false,
-        error: `Ya tienes una cita activa en ${datos.especialidadNombre} para el ${datos.fecha} (${duplicadoPaciente.hora}).`
-      };
-    }
+    const nowISO = new Date().toISOString();
+    const estadoInicial = MEDISYS_CONFIG.ESTADOS.PENDIENTE || "Pendiente";
 
-    const existingCodes = new Set(citas.map((c) => c.codigo));
-    let codigo = generateCode();
-    while (existingCodes.has(codigo)) {
-      codigo = generateCode();
-    }
-
-    const nuevaCita = {
-      id: `CIT-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
-      codigo,
+    const cita = {
+      id: "CITA-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6).toUpperCase(),
+      codigo: generateCodigo(citas),
       especialidadId: datos.especialidadId,
       especialidadNombre: datos.especialidadNombre,
       fecha: datos.fecha,
       hora: datos.hora,
-      paciente: {
-        nombre: datos.nombrePaciente,
-        documento: datos.documento,
-        telefono: datos.telefono
-      },
       documento: datos.documento,
-      estado: MEDISYS_CONFIG.ESTADOS.PENDIENTE,
-      motivoCancelacion: "",
-      creadoEn: new Date().toISOString(),
-      actualizadoEn: new Date().toISOString(),
-      historial: []
+      paciente: {
+        nombre: datos.paciente.nombre,
+        telefono: datos.paciente.telefono
+      },
+      estado: estadoInicial,
+      creadaEn: nowISO,
+      actualizadaEn: nowISO,
+      historial: [
+        {
+          estadoAnterior: null,
+          estadoNuevo: estadoInicial,
+          observacion: "Cita programada por el paciente",
+          actor: `Paciente (${datos.paciente.nombre})`,
+          fecha: nowISO
+        }
+      ]
     };
 
-    appendAudit(
-      nuevaCita,
-      null,
-      MEDISYS_CONFIG.ESTADOS.PENDIENTE,
-      `Paciente (${datos.documento})`,
-      "Solicitud registrada desde sesión autenticada"
-    );
-
-    citas.unshift(nuevaCita);
+    citas.push(cita);
     saveAll(citas);
-    return { ok: true, cita: nuevaCita };
+    return { ok: true, cita };
   }
 
-  function listMyCitas(sessionUser) {
-    if (!sessionUser || sessionUser.role !== MEDISYS_CONFIG.ROLES.PACIENTE) return [];
-    return loadAll().filter((c) => c.documento === sessionUser.documento);
-  }
-
-  function transitionState(citaId, nuevoEstado, sessionUser, observacionRaw) {
-    if (!sessionUser) return { ok: false, error: "Sesión no válida." };
-
+  function listCitas(filtroEstado = "TODOS") {
     const citas = loadAll();
-    const idx = citas.findIndex((c) => c.id === citaId);
+    if (!filtroEstado || filtroEstado === "TODOS") return citas;
+    return citas.filter((c) => c.estado === filtroEstado);
+  }
+
+  function transitionState(citaId, nextState, actor = "Sistema", observacion = "") {
+    const citas = loadAll();
+    const idx = citas.findIndex((c) => c.id === citaId || c.codigo === citaId);
     if (idx === -1) return { ok: false, error: "Cita no encontrada." };
 
     const cita = citas[idx];
-
-    // Control de autorización por rol y propiedad
-    if (sessionUser.role === MEDISYS_CONFIG.ROLES.PACIENTE) {
-      if (cita.documento !== sessionUser.documento) {
-        return { ok: false, error: "No tienes permisos para modificar citas de otro paciente." };
-      }
-      if (nuevoEstado !== MEDISYS_CONFIG.ESTADOS.CANCELADA) {
-        return { ok: false, error: "Un paciente solo puede cancelar sus propias citas." };
-      }
-    }
-
-    if (!MediSysValidators.canTransition(cita.estado, nuevoEstado)) {
+    if (!MediSysValidators.canTransition(cita.estado, nextState)) {
       return {
         ok: false,
-        error: `Transición inválida: "${cita.estado}" no puede pasar a "${nuevoEstado}".`
+        error: `Transición no permitida de ${cita.estado} a ${nextState}.`
       };
     }
 
-    const observacion = MediSysValidators.sanitizeText(observacionRaw || "");
-    if (nuevoEstado === MEDISYS_CONFIG.ESTADOS.CANCELADA && observacion && observacion.length < 4) {
-      return {
-        ok: false,
-        error: "Si indicas un motivo de cancelación, debe tener al menos 4 caracteres."
-      };
-    }
-
-    const estadoAnterior = cita.estado;
-    const actor =
-      sessionUser.role === MEDISYS_CONFIG.ROLES.ADMIN
-        ? `Administrador (${sessionUser.nombre})`
-        : `Paciente (${sessionUser.documento})`;
-
-    cita.estado = nuevoEstado;
-    cita.actualizadoEn = new Date().toISOString();
-    if (nuevoEstado === MEDISYS_CONFIG.ESTADOS.CANCELADA) {
-      cita.motivoCancelacion = observacion || `Cancelada por ${actor}`;
-    }
-
-    appendAudit(cita, estadoAnterior, nuevoEstado, actor, observacion || `Estado actualizado a ${nuevoEstado}`);
+    const nowISO = new Date().toISOString();
+    const prev = cita.estado;
+    cita.estado = nextState;
+    cita.actualizadaEn = nowISO;
+    cita.historial = Array.isArray(cita.historial) ? cita.historial : [];
+    cita.historial.push({
+      estadoAnterior: prev,
+      estadoNuevo: nextState,
+      observacion: observacion || `Cambio de estado a ${nextState}`,
+      actor,
+      fecha: nowISO
+    });
 
     citas[idx] = cita;
     saveAll(citas);
     return { ok: true, cita };
   }
 
-  function listAllForAdmin(sessionUser, estadoFiltro = "TODOS") {
-    if (!sessionUser || sessionUser.role !== MEDISYS_CONFIG.ROLES.ADMIN) {
-      return { ok: false, error: "Acceso denegado: se requiere rol Administrador.", citas: [] };
-    }
-    const todas = loadAll();
-    const filtradas =
-      !estadoFiltro || estadoFiltro === "TODOS"
-        ? todas
-        : todas.filter((c) => c.estado === estadoFiltro);
-    return { ok: true, citas: filtradas, todas };
+  function cancelByPatient(codigo, documento, motivo = "Cancelada por el paciente") {
+    const docNorm = MediSysValidators.normalizeDocument(documento);
+    const citas = loadAll();
+    const cita = citas.find(
+      (c) => c.codigo === codigo && MediSysValidators.normalizeDocument(c.documento) === docNorm
+    );
+    if (!cita) return { ok: false, error: "No se encontró la cita para tu documento." };
+
+    const estadoCancelada = MEDISYS_CONFIG.ESTADOS.CANCELADA || "Cancelada";
+    return transitionState(cita.id, estadoCancelada, `Paciente (${cita.paciente?.nombre || docNorm})`, motivo);
   }
 
   return {
+    loadAll,
     getOccupiedSlots,
     createCita,
-    listMyCitas,
+    listCitas,
     transitionState,
-    listAllForAdmin
+    cancelByPatient
   };
 })();
