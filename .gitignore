@@ -1,0 +1,15 @@
+# Entornos y secretos
+.env
+.env.*
+!.env.example
+
+# Dependencias y compilaciones
+node_modules/
+dist/
+build/
+coverage/
+
+# Archivos de sistema y editores
+.DS_Store
+Thumbs.db
+*.log
