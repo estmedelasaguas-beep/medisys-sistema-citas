@@ -52,6 +52,14 @@
     adminTablaCuerpo: document.getElementById("admin-tabla-cuerpo")
   };
 
+  function getCitaPacienteNombre(cita) {
+    return cita?.paciente?.nombre || cita?.pacienteNombre || cita?.nombrePaciente || "Paciente";
+  }
+
+  function getCitaDocumento(cita) {
+    return MediSysValidators.normalizeDocument(cita?.documento || cita?.docPaciente || "");
+  }
+
   function showAlert(message, type = "info") {
     if (!els.banner) return;
     if (alertTimeout) clearTimeout(alertTimeout);
@@ -233,7 +241,10 @@
 
   function renderMisCitas() {
     const session = MediSysAuth.getSession();
-    const mias = MediSysStore.listCitas("TODOS").filter((c) => c.documento === session.documento);
+    const sessionDoc = MediSysValidators.normalizeDocument(session?.documento || "");
+    const mias = MediSysStore.listCitas("TODOS").filter(
+      (c) => getCitaDocumento(c) === sessionDoc
+    );
     els.misCitasLista.innerHTML = "";
 
     if (!mias.length) {
@@ -248,7 +259,7 @@
       head.className = "flex flex-wrap items-center justify-between gap-2";
 
       const info = document.createElement("div");
-      info.innerHTML = `<span class="font-mono font-bold text-teal-900">${cita.codigo}</span> · <strong>${cita.especialidadNombre}</strong> (${cita.fecha} · ${cita.hora}) — <span class="font-semibold">${cita.estado}</span>`;
+      info.innerHTML = `<span class="font-mono font-bold text-teal-900">${cita.codigo}</span> · <strong>${cita.especialidadNombre || cita.especialidadId || ""}</strong> (${cita.fecha} · ${cita.hora}) — <span class="font-semibold">${cita.estado}</span>`;
       head.appendChild(info);
 
       if (MediSysValidators.canTransition(cita.estado, MEDISYS_CONFIG.ESTADOS.CANCELADA)) {
@@ -257,7 +268,7 @@
         btnC.textContent = "Cancelar cita";
         btnC.className = "bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer";
         btnC.addEventListener("click", () => {
-          const res = MediSysStore.cancelByPatient(cita.codigo, cita.documento, "Cancelada por el paciente");
+          const res = MediSysStore.cancelByPatient(cita.codigo, sessionDoc, "Cancelada por el paciente");
           if (!res.ok) return showAlert(res.error, "error");
           showAlert("Cita cancelada y horario liberado.", "success");
           renderMisCitas();
@@ -267,7 +278,7 @@
 
       const hist = document.createElement("ul");
       hist.className = "text-xs text-slate-600 space-y-1 border-t border-slate-200 pt-2";
-      cita.historial.forEach((h) => {
+      (cita.historial || []).forEach((h) => {
         const li = document.createElement("li");
         li.textContent = `${h.estadoAnterior ? h.estadoAnterior + " → " : ""}${h.estadoNuevo} · ${h.observacion} (${h.actor})`;
         hist.appendChild(li);
@@ -306,7 +317,7 @@
       card.className = "p-4 rounded-xl border border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-4";
 
       const left = document.createElement("div");
-      left.innerHTML = `<span class="font-mono font-bold text-teal-900">${cita.codigo}</span> · <strong>${cita.paciente.nombre}</strong> (Doc: ${cita.documento}) · ${cita.fecha} ${cita.hora} — <span class="font-semibold">${cita.estado}</span>`;
+      left.innerHTML = `<span class="font-mono font-bold text-teal-900">${cita.codigo}</span> · <strong>${getCitaPacienteNombre(cita)}</strong> (Doc: ${getCitaDocumento(cita)}) · ${cita.fecha} ${cita.hora} — <span class="font-semibold">${cita.estado}</span>`;
       card.appendChild(left);
 
       if (cita.estado === "Confirmada" || cita.estado === "Pendiente") {
@@ -359,8 +370,8 @@
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td class="p-3 font-mono font-bold">${cita.codigo}</td>
-        <td class="p-3">${cita.paciente.nombre} <span class="text-xs text-slate-400">(${cita.documento})</span></td>
-        <td class="p-3">${cita.especialidadNombre}</td>
+        <td class="p-3">${getCitaPacienteNombre(cita)} <span class="text-xs text-slate-400">(${getCitaDocumento(cita)})</span></td>
+        <td class="p-3">${cita.especialidadNombre || cita.especialidadId || ""}</td>
         <td class="p-3">${cita.fecha} · ${cita.hora}</td>
         <td class="p-3"><span class="badge"></span></td>
         <td class="p-3"></td>
@@ -463,7 +474,7 @@
       const { cita } = res;
       applyBadge(els.compEstado, cita.estado);
       els.compCodigo.textContent = cita.codigo;
-      els.compDetalle.textContent = `${cita.paciente.nombre} (${cita.documento}) · ${cita.especialidadNombre} · ${cita.fecha} ${cita.hora}`;
+      els.compDetalle.textContent = `${getCitaPacienteNombre(cita)} (${getCitaDocumento(cita)}) · ${cita.especialidadNombre} · ${cita.fecha} ${cita.hora}`;
       els.comprobanteBox.classList.remove("hidden");
       showAlert("Cita registrada correctamente.", "success");
       renderHorarios();
