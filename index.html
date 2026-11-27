@@ -1,0 +1,224 @@
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <title>MediSys | Gestión de Citas Médicas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased">
+
+  <header class="bg-teal-800 text-white shadow-sm sticky top-0 z-20">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2.5">
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-600 font-bold text-sm">MS</span>
+          <h1 class="text-xl font-bold tracking-tight">MediSys</h1>
+        </div>
+        <p class="text-xs text-teal-100 mt-0.5">Sistema de gestión, disponibilidad y trazabilidad de citas médicas</p>
+      </div>
+
+      <nav aria-label="Navegación principal" class="flex flex-wrap gap-2 text-sm">
+        <button type="button" data-tab="agendar" class="nav-btn nav-btn--active px-3.5 py-2 rounded-lg font-semibold transition">
+          Agendar cita
+        </button>
+        <button type="button" data-tab="consultar" class="nav-btn px-3.5 py-2 rounded-lg font-medium transition">
+          Consultar / Cancelar
+        </button>
+        <button type="button" data-tab="admin" class="nav-btn px-3.5 py-2 rounded-lg font-medium transition">
+          Administración
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
+    <div id="banner-alerta" role="alert" class="hidden mb-6 p-4 rounded-xl border text-sm font-medium"></div>
+
+    <!-- VISTA 1: AGENDAR CITA -->
+    <section id="vista-agendar" class="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+      <div class="border-b border-slate-100 pb-4 mb-6">
+        <h2 class="text-xl font-bold text-slate-900">Programar cita médica</h2>
+        <p class="text-sm text-slate-500 mt-1">
+          Selecciona especialidad y fecha para consultar los bloques disponibles y evitar cruces de agenda.
+        </p>
+      </div>
+
+      <form id="form-agendar" novalidate class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div>
+          <label for="ag-especialidad" class="block text-sm font-semibold text-slate-700 mb-1.5">
+            Especialidad médica <span class="text-rose-600">*</span>
+          </label>
+          <select id="ag-especialidad" required class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none">
+            <option value="">Selecciona una especialidad</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="ag-fecha" class="block text-sm font-semibold text-slate-700 mb-1.5">
+            Fecha de atención <span class="text-rose-600">*</span>
+          </label>
+          <input type="date" id="ag-fecha" required class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none" />
+          <p id="ag-rango-info" class="text-xs text-slate-400 mt-1"></p>
+        </div>
+
+        <div class="md:col-span-2">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-semibold text-slate-700">
+              Bloques horarios <span class="text-rose-600">*</span>
+            </span>
+            <span id="ag-resumen-cupos" class="text-xs text-slate-500"></span>
+          </div>
+          <div id="grid-horarios" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5"></div>
+          <input type="hidden" id="ag-hora" />
+        </div>
+
+        <div>
+          <label for="ag-nombre" class="block text-sm font-semibold text-slate-700 mb-1.5">
+            Nombre completo del paciente <span class="text-rose-600">*</span>
+          </label>
+          <input type="text" id="ag-nombre" required maxlength="120" placeholder="Ej. Camila Andrea Rojas" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none" />
+        </div>
+
+        <div>
+          <label for="ag-documento" class="block text-sm font-semibold text-slate-700 mb-1.5">
+            Número de documento (6 a 15 dígitos) <span class="text-rose-600">*</span>
+          </label>
+          <input type="text" id="ag-documento" required inputmode="numeric" maxlength="15" placeholder="Ej. 1090123456" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none" />
+        </div>
+
+        <div class="md:col-span-2">
+          <label for="ag-telefono" class="block text-sm font-semibold text-slate-700 mb-1.5">
+            Teléfono de contacto <span class="text-rose-600">*</span>
+          </label>
+          <input type="tel" id="ag-telefono" required maxlength="20" placeholder="Ej. 3112345678" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none" />
+        </div>
+
+        <div class="md:col-span-2 pt-2 flex flex-wrap items-center justify-between gap-3">
+          <span class="text-xs text-slate-500">
+            Restricción activa: máximo una cita activa por especialidad, fecha y hora.
+          </span>
+          <button type="submit" class="bg-teal-700 hover:bg-teal-800 text-white font-semibold px-6 py-3 rounded-xl text-sm transition cursor-pointer">
+            Registrar cita
+          </button>
+        </div>
+      </form>
+
+      <div id="comprobante-box" class="hidden mt-6 p-5 rounded-2xl bg-teal-50 border border-teal-200">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-teal-800">Comprobante de registro</span>
+          <span id="comp-estado" class="badge badge--pendiente"></span>
+        </div>
+        <p id="comp-codigo" class="text-2xl font-mono font-bold text-teal-950 mt-2"></p>
+        <p id="comp-detalle" class="text-sm text-slate-700 mt-1.5"></p>
+        <p class="text-xs text-slate-500 mt-3">
+          Guarda tu código de referencia y número de documento para consultar o cancelar la cita.
+        </p>
+      </div>
+    </section>
+
+    <!-- VISTA 2: CONSULTAR, TRAZABILIDAD Y CANCELAR -->
+    <section id="vista-consultar" class="hidden bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+      <div class="border-b border-slate-100 pb-4 mb-6">
+        <h2 class="text-xl font-bold text-slate-900">Consultar estado, historial y cancelar</h2>
+        <p class="text-sm text-slate-500 mt-1">
+          Ingresa el código de referencia y el documento del paciente para ver el detalle y la trazabilidad.
+        </p>
+      </div>
+
+      <form id="form-consultar" novalidate class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div>
+          <label for="cons-codigo" class="block text-xs font-semibold uppercase text-slate-600 mb-1">Código de referencia</label>
+          <input type="text" id="cons-codigo" required maxlength="16" placeholder="Ej. MED-A1B2C3D4" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-mono uppercase focus:border-teal-600 focus:outline-none" />
+        </div>
+        <div>
+          <label for="cons-documento" class="block text-xs font-semibold uppercase text-slate-600 mb-1">Documento del paciente</label>
+          <input type="text" id="cons-documento" required inputmode="numeric" maxlength="15" placeholder="Ej. 1090123456" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none" />
+        </div>
+        <div class="flex items-end">
+          <button type="submit" class="w-full bg-teal-700 hover:bg-teal-800 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition cursor-pointer">
+            Consultar cita
+          </button>
+        </div>
+      </form>
+
+      <div id="consulta-resultado" class="hidden border-t border-slate-200 pt-6">
+        <div class="flex flex-wrap items-start justify-between gap-4 bg-slate-50 border border-slate-200 rounded-2xl p-5">
+          <div>
+            <div class="flex items-center gap-2.5">
+              <span id="cons-res-estado" class="badge"></span>
+              <span id="cons-res-codigo" class="font-mono font-bold text-slate-900"></span>
+            </div>
+            <h3 id="cons-res-titulo" class="text-lg font-bold text-slate-900 mt-2"></h3>
+            <p id="cons-res-info" class="text-sm text-slate-600 mt-1"></p>
+            <p id="cons-res-motivo" class="text-xs text-rose-700 font-medium mt-2 hidden"></p>
+          </div>
+
+          <div id="cancelar-panel" class="hidden w-full sm:w-auto sm:min-w-[260px] bg-white p-3.5 rounded-xl border border-slate-200">
+            <label for="cons-motivo" class="block text-xs font-semibold text-slate-700 mb-1">Motivo de cancelación</label>
+            <input type="text" id="cons-motivo" maxlength="200" placeholder="Opcional (mín. 4 caracteres si se indica)" class="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs mb-2 focus:border-rose-500 focus:outline-none" />
+            <button type="button" id="btn-cancelar-cita" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold px-4 py-2 rounded-lg text-xs transition cursor-pointer">
+              Cancelar cita y liberar bloque
+            </button>
+          </div>
+        </div>
+
+        <h4 class="text-sm font-bold text-slate-800 mt-6 mb-3">Historial de trazabilidad</h4>
+        <ol id="lista-trazabilidad" class="space-y-2.5"></ol>
+      </div>
+    </section>
+
+    <!-- VISTA 3: PANEL ADMINISTRATIVO -->
+    <section id="vista-admin" class="hidden bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+      <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-6">
+        <div>
+          <h2 class="text-xl font-bold text-slate-900">Panel de gestión y control de estados</h2>
+          <p class="text-sm text-slate-500 mt-1">
+            Supervisa citas, filtra por estado y aplica transiciones válidas según la regla de negocio.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <label for="filtro-estado" class="text-xs font-semibold text-slate-600">Estado:</label>
+          <select id="filtro-estado" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium">
+            <option value="TODOS">Todos</option>
+            <option value="Pendiente">Pendiente</option>
+            <option value="Confirmada">Confirmada</option>
+            <option value="Atendida">Atendida</option>
+            <option value="Cancelada">Cancelada</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6" id="metricas-admin"></div>
+
+      <div class="overflow-x-auto rounded-xl border border-slate-200">
+        <table class="w-full text-left border-collapse text-sm">
+          <thead>
+            <tr class="bg-slate-100 text-slate-700 border-b border-slate-200 text-xs uppercase">
+              <th class="p-3">Código</th>
+              <th class="p-3">Paciente</th>
+              <th class="p-3">Especialidad</th>
+              <th class="p-3">Fecha y Hora</th>
+              <th class="p-3">Estado</th>
+              <th class="p-3">Acción permitida</th>
+            </tr>
+          </thead>
+          <tbody id="admin-tabla-cuerpo" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+    MediSys · Arquitectura modular con restricciones de dominio y trazabilidad · Usa datos ficticios para pruebas.
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/validators.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
