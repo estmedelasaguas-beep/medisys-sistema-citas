@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-  <title>MediSys | Acceso y Gestión de Citas Médicas</title>
+  <title>MediSys | Inicio de Sesión y Gestión Médica</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -22,13 +22,16 @@
 
       <div id="header-session-bar" class="hidden flex flex-wrap items-center gap-3">
         <nav aria-label="Navegación principal" class="flex flex-wrap gap-2 text-sm">
-          <button type="button" data-tab="agendar" data-role="PACIENTE" class="nav-btn px-3.5 py-2 rounded-lg font-medium transition cursor-pointer">
+          <button type="button" data-tab="agendar" data-role="PACIENTE" class="nav-btn px-3.5 py-2 rounded-lg font-medium bg-white/10 hover:bg-white/20 cursor-pointer">
             Agendar cita
           </button>
-          <button type="button" data-tab="consultar" data-role="PACIENTE" class="nav-btn px-3.5 py-2 rounded-lg font-medium transition cursor-pointer">
+          <button type="button" data-tab="consultar" data-role="PACIENTE" class="nav-btn px-3.5 py-2 rounded-lg font-medium bg-white/10 hover:bg-white/20 cursor-pointer">
             Mis citas
           </button>
-          <button type="button" data-tab="admin" data-role="ADMIN" class="nav-btn px-3.5 py-2 rounded-lg font-medium transition cursor-pointer">
+          <button type="button" data-tab="medico" data-role="MEDICO" class="nav-btn px-3.5 py-2 rounded-lg font-medium bg-white/10 hover:bg-white/20 cursor-pointer">
+            Agenda médica
+          </button>
+          <button type="button" data-tab="admin" data-role="ADMIN" class="nav-btn px-3.5 py-2 rounded-lg font-medium bg-white/10 hover:bg-white/20 cursor-pointer">
             Administración
           </button>
         </nav>
@@ -38,7 +41,7 @@
             <p id="session-user-name" class="text-xs font-semibold text-white leading-tight"></p>
             <p id="session-user-role" class="text-[11px] text-teal-200 uppercase"></p>
           </div>
-          <button type="button" id="btn-logout" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer">
+          <button type="button" id="btn-logout" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer">
             Salir
           </button>
         </div>
@@ -47,53 +50,67 @@
   </header>
 
   <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
-    <div id="banner-alerta" role="alert" class="hidden mb-6 p-4 rounded-xl border text-sm font-medium"></div>
+    <div id="banner-alerta" role="alert" class="hidden mb-6 p-4 rounded-xl border text-sm font-medium vista-animada"></div>
 
-    <!-- PANTALLA DE LOGIN / REGISTRO -->
-    <section id="vista-auth" class="max-w-md mx-auto bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+    <!-- PANTALLA INICIAL: LOGIN Y REGISTRO DE PACIENTE -->
+    <section id="vista-auth" class="vista-animada max-w-md mx-auto bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
       <div class="text-center mb-6">
         <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-50 text-teal-700 font-bold text-lg border border-teal-200 mb-3">
           MS
         </span>
-        <h2 class="text-2xl font-bold text-slate-900">Acceso a MediSys</h2>
-        <p class="text-sm text-slate-500 mt-1">Inicia sesión o crea tu cuenta de paciente.</p>
+        <h2 class="text-2xl font-bold text-slate-900">Iniciar sesión en MediSys</h2>
+        <p class="text-sm text-slate-500 mt-1">Selecciona tu rol, documento y contraseña para ingresar.</p>
       </div>
 
       <div class="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl mb-6 text-sm font-semibold">
-        <button type="button" id="auth-tab-login" class="py-2 rounded-lg bg-white text-teal-800 shadow-sm transition cursor-pointer">
+        <button type="button" id="auth-tab-login" class="py-2 rounded-lg bg-white text-teal-800 shadow-sm cursor-pointer">
           Iniciar sesión
         </button>
-        <button type="button" id="auth-tab-register" class="py-2 rounded-lg text-slate-600 hover:text-slate-900 transition cursor-pointer">
-          Registrarme
+        <button type="button" id="auth-tab-register" class="py-2 rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer">
+          Registrar paciente
         </button>
       </div>
 
+      <!-- FORMULARIO LOGIN -->
       <form id="form-login" novalidate class="space-y-4">
         <div>
-          <label for="login-identificador" class="block text-sm font-semibold text-slate-700 mb-1">
-            Documento o correo <span class="text-rose-600">*</span>
+          <label for="login-rol" class="block text-sm font-semibold text-slate-700 mb-1">
+            Rol de acceso <span class="text-rose-600">*</span>
           </label>
-          <input type="text" id="login-identificador" required placeholder="Ej. 1090123456 o admin@medisys.local" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none" />
+          <select id="login-rol" required class="select-anim w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none">
+            <option value="PACIENTE">Paciente</option>
+            <option value="MEDICO">Médico</option>
+            <option value="ADMIN">Administrador</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="login-documento" class="block text-sm font-semibold text-slate-700 mb-1">
+            Número de documento <span class="text-rose-600">*</span>
+          </label>
+          <input type="text" id="login-documento" required inputmode="numeric" maxlength="15" placeholder="Ej. 1090123456" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none transition" />
         </div>
 
         <div>
           <label for="login-password" class="block text-sm font-semibold text-slate-700 mb-1">
             Contraseña <span class="text-rose-600">*</span>
           </label>
-          <input type="password" id="login-password" required placeholder="••••••••" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none" />
+          <input type="password" id="login-password" required placeholder="••••••••" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none transition" />
         </div>
 
-        <button type="submit" class="w-full bg-teal-700 hover:bg-teal-800 text-white font-semibold py-3 rounded-xl text-sm transition cursor-pointer">
-          Ingresar al sistema
+        <button type="submit" class="w-full bg-teal-700 hover:bg-teal-800 text-white font-semibold py-3 rounded-xl text-sm cursor-pointer">
+          Ingresar a mi interfaz
         </button>
 
-        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
-          <p class="font-bold text-slate-700">Acceso de demostración (Administrador):</p>
-          <p>Usuario: <span class="font-mono font-semibold">admin@medisys.local</span></p>
-          <p>Contraseña: <span class="font-mono font-semibold">Admin2026*</span></p>
+        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1.5">
+          <p class="font-bold text-slate-700">Cuentas de prueba precargadas:</p>
+          <p><span class="font-semibold">Médico (Medicina General):</span> Doc <span class="font-mono">20000001</span> · Clave <span class="font-mono">Medico2026*</span></p>
+          <p><span class="font-semibold">Administrador:</span> Doc <span class="font-mono">10000001</span> · Clave <span class="font-mono">Admin2026*</span></p>
+          <p class="text-slate-400">¿Eres paciente nuevo? Usa la pestaña "Registrar paciente".</p>
         </div>
       </form>
 
+      <!-- FORMULARIO REGISTRO PACIENTE -->
       <form id="form-register" novalidate class="hidden space-y-4">
         <div>
           <label for="reg-nombre" class="block text-sm font-semibold text-slate-700 mb-1">
@@ -123,18 +140,18 @@
           <input type="password" id="reg-password" required minlength="8" placeholder="Mín. 8 caracteres, mayúscula, minúscula, número y símbolo" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none" />
         </div>
 
-        <button type="submit" class="w-full bg-teal-700 hover:bg-teal-800 text-white font-semibold py-3 rounded-xl text-sm transition cursor-pointer">
-          Crear cuenta y entrar
+        <button type="submit" class="w-full bg-teal-700 hover:bg-teal-800 text-white font-semibold py-3 rounded-xl text-sm cursor-pointer">
+          Crear cuenta de paciente
         </button>
       </form>
     </section>
 
-    <!-- VISTA 1: AGENDAR CITA (PACIENTE) -->
-    <section id="vista-agendar" class="hidden bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+    <!-- INTERFAZ PACIENTE 1: AGENDAR CITA -->
+    <section id="vista-agendar" class="hidden vista-animada bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
       <div class="border-b border-slate-100 pb-4 mb-6">
         <h2 class="text-xl font-bold text-slate-900">Programar cita médica</h2>
         <p class="text-sm text-slate-500 mt-1">
-          Selecciona especialidad y fecha para consultar los bloques disponibles y evitar cruces de agenda.
+          Selecciona especialidad, fecha y un bloque horario disponible.
         </p>
       </div>
 
@@ -143,7 +160,7 @@
           <label for="ag-especialidad" class="block text-sm font-semibold text-slate-700 mb-1.5">
             Especialidad médica <span class="text-rose-600">*</span>
           </label>
-          <select id="ag-especialidad" required class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none">
+          <select id="ag-especialidad" required class="select-anim w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-teal-600 focus:outline-none">
             <option value="">Selecciona una especialidad</option>
           </select>
         </div>
@@ -168,12 +185,12 @@
         </div>
 
         <div>
-          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Paciente autenticado</label>
+          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Paciente</label>
           <input type="text" id="ag-nombre-readonly" readonly class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700" />
         </div>
 
         <div>
-          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Documento y contacto</label>
+          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Documento y teléfono</label>
           <input type="text" id="ag-doc-readonly" readonly class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700" />
         </div>
 
@@ -181,13 +198,13 @@
           <span class="text-xs text-slate-500">
             Restricción activa: máximo una cita activa por especialidad, fecha y hora.
           </span>
-          <button type="submit" class="bg-teal-700 hover:bg-teal-800 text-white font-semibold px-6 py-3 rounded-xl text-sm transition cursor-pointer">
+          <button type="submit" class="bg-teal-700 hover:bg-teal-800 text-white font-semibold px-6 py-3 rounded-xl text-sm cursor-pointer">
             Registrar cita
           </button>
         </div>
       </form>
 
-      <div id="comprobante-box" class="hidden mt-6 p-5 rounded-2xl bg-teal-50 border border-teal-200">
+      <div id="comprobante-box" class="hidden mt-6 p-5 rounded-2xl bg-teal-50 border border-teal-200 vista-animada">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <span class="text-xs font-bold uppercase tracking-wider text-teal-800">Comprobante de registro</span>
           <span id="comp-estado" class="badge badge--pendiente"></span>
@@ -197,29 +214,40 @@
       </div>
     </section>
 
-    <!-- VISTA 2: MIS CITAS Y TRAZABILIDAD (PACIENTE) -->
-    <section id="vista-consultar" class="hidden bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+    <!-- INTERFAZ PACIENTE 2: MIS CITAS Y TRAZABILIDAD -->
+    <section id="vista-consultar" class="hidden vista-animada bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
       <div class="border-b border-slate-100 pb-4 mb-6">
         <h2 class="text-xl font-bold text-slate-900">Mis citas y trazabilidad</h2>
         <p class="text-sm text-slate-500 mt-1">
-          Consulta el estado de tus citas, revisa el historial de cambios y cancélalas si lo necesitas.
+          Consulta tus citas programadas, su historial y cancélalas para liberar el horario.
         </p>
       </div>
       <div id="mis-citas-lista" class="space-y-4"></div>
     </section>
 
-    <!-- VISTA 3: PANEL ADMINISTRATIVO (ADMIN) -->
-    <section id="vista-admin" class="hidden bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+    <!-- INTERFAZ MÉDICO: AGENDA DE CONSULTA -->
+    <section id="vista-medico" class="hidden vista-animada bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+      <div class="border-b border-slate-100 pb-4 mb-6">
+        <h2 class="text-xl font-bold text-slate-900">Agenda médica</h2>
+        <p id="medico-subtitulo" class="text-sm text-slate-500 mt-1">
+          Revisa las citas asignadas a tu especialidad y registra su atención.
+        </p>
+      </div>
+      <div id="medico-citas-lista" class="space-y-4"></div>
+    </section>
+
+    <!-- INTERFAZ ADMINISTRADOR: PANEL DE GESTIÓN -->
+    <section id="vista-admin" class="hidden vista-animada bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
       <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-6">
         <div>
           <h2 class="text-xl font-bold text-slate-900">Panel de gestión y control de estados</h2>
           <p class="text-sm text-slate-500 mt-1">
-            Supervisa citas, filtra por estado y aplica transiciones válidas según la regla de negocio.
+            Supervisa todas las citas, filtra por estado y aplica transiciones válidas.
           </p>
         </div>
         <div class="flex items-center gap-2">
           <label for="filtro-estado" class="text-xs font-semibold text-slate-600">Estado:</label>
-          <select id="filtro-estado" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium">
+          <select id="filtro-estado" class="select-anim rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium">
             <option value="TODOS">Todos</option>
             <option value="Pendiente">Pendiente</option>
             <option value="Confirmada">Confirmada</option>
@@ -250,7 +278,7 @@
   </main>
 
   <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-    MediSys · Control de acceso RBAC, restricciones de dominio y trazabilidad · Datos ficticios para pruebas.
+    MediSys · Acceso por rol (Paciente, Médico, Administrador), hash SHA-256 y trazabilidad · Datos ficticios para pruebas.
   </footer>
 
   <script src="js/config.js"></script>
