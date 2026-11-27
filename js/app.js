@@ -1,17 +1,33 @@
 /**
- * Controlador de interfaz y eventos de MediSys (renderizado seguro sin HTML inyectado).
+ * Controlador principal de MediSys con enrutamiento protegido por rol (RBAC).
  */
 (() => {
-  let activeConsulta = null;
-
   const els = {
     banner: document.getElementById("banner-alerta"),
+    headerSessionBar: document.getElementById("header-session-bar"),
+    sessionUserName: document.getElementById("session-user-name"),
+    sessionUserRole: document.getElementById("session-user-role"),
+    btnLogout: document.getElementById("btn-logout"),
     navButtons: document.querySelectorAll(".nav-btn"),
+
+    vistaAuth: document.getElementById("vista-auth"),
+    authTabLogin: document.getElementById("auth-tab-login"),
+    authTabRegister: document.getElementById("auth-tab-register"),
+    formLogin: document.getElementById("form-login"),
+    loginIdentificador: document.getElementById("login-identificador"),
+    loginPassword: document.getElementById("login-password"),
+    formRegister: document.getElementById("form-register"),
+    regNombre: document.getElementById("reg-nombre"),
+    regDocumento: document.getElementById("reg-documento"),
+    regTelefono: document.getElementById("reg-telefono"),
+    regPassword: document.getElementById("reg-password"),
+
     vistas: {
       agendar: document.getElementById("vista-agendar"),
       consultar: document.getElementById("vista-consultar"),
       admin: document.getElementById("vista-admin")
     },
+
     formAgendar: document.getElementById("form-agendar"),
     selEspecialidad: document.getElementById("ag-especialidad"),
     inputFecha: document.getElementById("ag-fecha"),
@@ -19,27 +35,14 @@
     resumenCupos: document.getElementById("ag-resumen-cupos"),
     gridHorarios: document.getElementById("grid-horarios"),
     inputHora: document.getElementById("ag-hora"),
-    inputNombre: document.getElementById("ag-nombre"),
-    inputDocumento: document.getElementById("ag-documento"),
-    inputTelefono: document.getElementById("ag-telefono"),
+    agNombreReadonly: document.getElementById("ag-nombre-readonly"),
+    agDocReadonly: document.getElementById("ag-doc-readonly"),
     comprobanteBox: document.getElementById("comprobante-box"),
     compCodigo: document.getElementById("comp-codigo"),
     compDetalle: document.getElementById("comp-detalle"),
     compEstado: document.getElementById("comp-estado"),
 
-    formConsultar: document.getElementById("form-consultar"),
-    consCodigo: document.getElementById("cons-codigo"),
-    consDocumento: document.getElementById("cons-documento"),
-    consultaResultado: document.getElementById("consulta-resultado"),
-    consResEstado: document.getElementById("cons-res-estado"),
-    consResCodigo: document.getElementById("cons-res-codigo"),
-    consResTitulo: document.getElementById("cons-res-titulo"),
-    consResInfo: document.getElementById("cons-res-info"),
-    consResMotivo: document.getElementById("cons-res-motivo"),
-    cancelarPanel: document.getElementById("cancelar-panel"),
-    consMotivo: document.getElementById("cons-motivo"),
-    btnCancelarCita: document.getElementById("btn-cancelar-cita"),
-    listaTrazabilidad: document.getElementById("lista-trazabilidad"),
+    misCitasLista: document.getElementById("mis-citas-lista"),
 
     filtroEstado: document.getElementById("filtro-estado"),
     metricasAdmin: document.getElementById("metricas-admin"),
@@ -75,15 +78,79 @@
     badgeEl.textContent = estado;
   }
 
-  function switchTab(tabName) {
+  function toggleAuthMode(mode) {
     hideAlert();
+    const isLogin = mode === "login";
+    els.formLogin.classList.toggle("hidden", !isLogin);
+    els.formRegister.classList.toggle("hidden", isLogin);
+
+    els.authTabLogin.className = isLogin
+      ? "py-2 rounded-lg bg-white text-teal-800 shadow-sm transition cursor-pointer"
+      : "py-2 rounded-lg text-slate-600 hover:text-slate-900 transition cursor-pointer";
+
+    els.authTabRegister.className = !isLogin
+      ? "py-2 rounded-lg bg-white text-teal-800 shadow-sm transition cursor-pointer"
+      : "py-2 rounded-lg text-slate-600 hover:text-slate-900 transition cursor-pointer";
+  }
+
+  function syncUIWithSession() {
+    const session = MediSysAuth.getSession();
+
+    // Ocultar todas las vistas primero
+    els.vistaAuth.classList.add("hidden");
+    Object.values(els.vistas).forEach((sec) => sec.classList.add("hidden"));
+
+    if (!session) {
+      els.headerSessionBar.classList.add("hidden");
+      els.vistaAuth.classList.remove("hidden");
+      return;
+    }
+
+    // Mostrar barra de sesión y filtrar botones por rol
+    els.headerSessionBar.classList.remove("hidden");
+    els.sessionUserName.textContent = session.nombre;
+    els.sessionUserRole.textContent =
+      session.role === MEDISYS_CONFIG.ROLES.ADMIN ? "Rol: Administrador" : `Doc: ${session.documento}`;
+
+    els.navButtons.forEach((btn) => {
+      const allowed = btn.dataset.role === session.role;
+      btn.classList.toggle("hidden", !allowed);
+    });
+
+    if (session.role === MEDISYS_CONFIG.ROLES.ADMIN) {
+      switchTab("admin");
+    } else {
+      els.agNombreReadonly.value = session.nombre;
+      els.agDocReadonly.value = `CC ${session.documento} · Tel: ${session.telefono}`;
+      switchTab("agendar");
+    }
+  }
+
+  function switchTab(tabName) {
+    const session = MediSysAuth.getSession();
+    if (!session) {
+      syncUIWithSession();
+      return;
+    }
+
+    // Guardián RBAC: impide cambiar a una vista que no pertenece al rol
+    if (session.role === MEDISYS_CONFIG.ROLES.ADMIN && tabName !== "admin") {
+      tabName = "admin";
+    }
+    if (session.role === MEDISYS_CONFIG.ROLES.PACIENTE && tabName === "admin") {
+      showAlert("Acceso denegado: el panel administrativo es exclusivo para administradores.", "error");
+      tabName = "agendar";
+    }
+
     Object.entries(els.vistas).forEach(([key, section]) => {
       section.classList.toggle("hidden", key !== tabName);
     });
     els.navButtons.forEach((btn) => {
       btn.classList.toggle("nav-btn--active", btn.dataset.tab === tabName);
     });
+
     if (tabName === "agendar") renderHorarios();
+    if (tabName === "consultar") renderMisCitas();
     if (tabName === "admin") renderAdmin();
   }
 
@@ -117,9 +184,7 @@
     const disponiblesCount = espId && fecha ? total - ocupados.length : total;
 
     els.resumenCupos.textContent =
-      espId && fecha
-        ? `${disponiblesCount} de ${total} bloques disponibles`
-        : "Selecciona especialidad y fecha";
+      espId && fecha ? `${disponiblesCount} de ${total} bloques disponibles` : "Selecciona especialidad y fecha";
 
     MEDISYS_CONFIG.BLOQUES_HORARIOS.forEach((hora) => {
       const ocupado = Boolean(espId && fecha && ocupados.includes(hora));
@@ -147,7 +212,6 @@
           btn.classList.add("slot-btn--selected");
         });
       }
-
       els.gridHorarios.appendChild(btn);
     });
   }
@@ -155,15 +219,16 @@
   function handleAgendarSubmit(e) {
     e.preventDefault();
     hideAlert();
+    const session = MediSysAuth.getSession();
 
-    const result = MediSysStore.createCita({
-      especialidadId: els.selEspecialidad.value,
-      fecha: els.inputFecha.value,
-      hora: els.inputHora.value,
-      nombrePaciente: els.inputNombre.value,
-      documento: els.inputDocumento.value,
-      telefono: els.inputTelefono.value
-    });
+    const result = MediSysStore.createCita(
+      {
+        especialidadId: els.selEspecialidad.value,
+        fecha: els.inputFecha.value,
+        hora: els.inputHora.value
+      },
+      session
+    );
 
     if (!result.ok) {
       showAlert(result.error, "error");
@@ -171,116 +236,136 @@
     }
 
     const { cita } = result;
-    showAlert("Cita registrada correctamente y bloque horario reservado.", "success");
+    showAlert("Cita registrada correctamente.", "success");
 
     applyBadgeStyle(els.compEstado, cita.estado);
     els.compCodigo.textContent = cita.codigo;
-    els.compDetalle.textContent =
-      `${cita.paciente.nombre} (Doc: ${cita.documento}) · ${cita.especialidadNombre} · ${cita.fecha} a las ${cita.hora}`;
+    els.compDetalle.textContent = `${cita.especialidadNombre} · ${cita.fecha} a las ${cita.hora} · Paciente: ${cita.paciente.nombre}`;
     els.comprobanteBox.classList.remove("hidden");
-
-    els.inputNombre.value = "";
-    els.inputDocumento.value = "";
-    els.inputTelefono.value = "";
     renderHorarios();
   }
 
-  function renderConsultaResult(cita) {
-    activeConsulta = cita;
-    els.consultaResultado.classList.remove("hidden");
-    applyBadgeStyle(els.consResEstado, cita.estado);
-    els.consResCodigo.textContent = cita.codigo;
-    els.consResTitulo.textContent = `${cita.especialidadNombre} — ${cita.paciente.nombre}`;
-    els.consResInfo.textContent =
-      `Documento: ${cita.documento} · Teléfono: ${cita.paciente.telefono} · Fecha: ${cita.fecha} · Hora: ${cita.hora}`;
+  function renderMisCitas() {
+    const session = MediSysAuth.getSession();
+    const citas = MediSysStore.listMyCitas(session);
+    els.misCitasLista.innerHTML = "";
 
-    if (cita.motivoCancelacion) {
-      els.consResMotivo.textContent = `Observación / Motivo: ${cita.motivoCancelacion}`;
-      els.consResMotivo.classList.remove("hidden");
-    } else {
-      els.consResMotivo.classList.add("hidden");
+    if (citas.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "text-sm text-slate-400 text-center py-8 bg-slate-50 rounded-xl border border-slate-200";
+      empty.textContent = "Aún no tienes citas registradas en tu cuenta.";
+      els.misCitasLista.appendChild(empty);
+      return;
     }
 
-    const puedeCancelar = MediSysValidators.canTransition(cita.estado, MEDISYS_CONFIG.ESTADOS.CANCELADA);
-    els.cancelarPanel.classList.toggle("hidden", !puedeCancelar);
-    els.consMotivo.value = "";
+    citas.forEach((cita) => {
+      const card = document.createElement("article");
+      card.className = "p-5 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-4";
 
-    els.listaTrazabilidad.innerHTML = "";
-    cita.historial.forEach((item) => {
-      const li = document.createElement("li");
-      li.className = "p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs";
+      const top = document.createElement("div");
+      top.className = "flex flex-wrap items-start justify-between gap-4";
 
-      const left = document.createElement("div");
-      const title = document.createElement("p");
-      title.className = "font-semibold text-slate-800";
-      title.textContent = item.estadoAnterior
-        ? `${item.estadoAnterior} → ${item.estadoNuevo} (${item.actor})`
-        : `Estado inicial: ${item.estadoNuevo} (${item.actor})`;
+      const info = document.createElement("div");
+      const headerRow = document.createElement("div");
+      headerRow.className = "flex items-center gap-2.5";
 
-      const desc = document.createElement("p");
-      desc.className = "text-slate-500 mt-0.5";
-      desc.textContent = item.observacion || "";
+      const badge = document.createElement("span");
+      applyBadgeStyle(badge, cita.estado);
 
-      left.appendChild(title);
-      left.appendChild(desc);
+      const codeSpan = document.createElement("span");
+      codeSpan.className = "font-mono font-bold text-slate-900 text-sm";
+      codeSpan.textContent = cita.codigo;
 
-      const right = document.createElement("span");
-      right.className = "text-slate-400 font-mono";
-      right.textContent = new Date(item.timestamp).toLocaleString("es-CO");
+      headerRow.appendChild(badge);
+      headerRow.appendChild(codeSpan);
 
-      li.appendChild(left);
-      li.appendChild(right);
-      els.listaTrazabilidad.appendChild(li);
+      const title = document.createElement("h3");
+      title.className = "text-base font-bold text-slate-900 mt-1.5";
+      title.textContent = `${cita.especialidadNombre} · ${cita.fecha} a las ${cita.hora}`;
+
+      info.appendChild(headerRow);
+      info.appendChild(title);
+
+      if (cita.motivoCancelacion) {
+        const mot = document.createElement("p");
+        mot.className = "text-xs text-rose-700 mt-1";
+        mot.textContent = `Observación: ${cita.motivoCancelacion}`;
+        info.appendChild(mot);
+      }
+
+      top.appendChild(info);
+
+      if (MediSysValidators.canTransition(cita.estado, MEDISYS_CONFIG.ESTADOS.CANCELADA)) {
+        const cancelBox = document.createElement("div");
+        cancelBox.className = "flex flex-wrap items-center gap-2";
+
+        const motivoInput = document.createElement("input");
+        motivoInput.type = "text";
+        motivoInput.maxLength = 150;
+        motivoInput.placeholder = "Motivo (opcional)";
+        motivoInput.className = "rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs";
+
+        const btnCancel = document.createElement("button");
+        btnCancel.type = "button";
+        btnCancel.className = "bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-3.5 py-1.5 rounded-lg cursor-pointer";
+        btnCancel.textContent = "Cancelar cita";
+        btnCancel.addEventListener("click", () => {
+          const res = MediSysStore.transitionState(
+            cita.id,
+            MEDISYS_CONFIG.ESTADOS.CANCELADA,
+            session,
+            motivoInput.value
+          );
+          if (!res.ok) {
+            showAlert(res.error, "error");
+          } else {
+            showAlert(`Cita ${cita.codigo} cancelada y horario liberado.`, "success");
+            renderMisCitas();
+          }
+        });
+
+        cancelBox.appendChild(motivoInput);
+        cancelBox.appendChild(btnCancel);
+        top.appendChild(cancelBox);
+      }
+
+      // Historial de trazabilidad
+      const traceList = document.createElement("ol");
+      traceList.className = "space-y-1.5 border-t border-slate-200 pt-3";
+      cita.historial.forEach((h) => {
+        const li = document.createElement("li");
+        li.className = "text-xs text-slate-600 flex flex-wrap justify-between gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200";
+        const left = document.createElement("span");
+        left.textContent = `${h.estadoAnterior ? h.estadoAnterior + " → " : ""}${h.estadoNuevo} · ${h.observacion} (${h.actor})`;
+        const right = document.createElement("span");
+        right.className = "font-mono text-slate-400";
+        right.textContent = new Date(h.timestamp).toLocaleString("es-CO");
+        li.appendChild(left);
+        li.appendChild(right);
+        traceList.appendChild(li);
+      });
+
+      card.appendChild(top);
+      card.appendChild(traceList);
+      els.misCitasLista.appendChild(card);
     });
   }
 
-  function handleConsultarSubmit(e) {
-    e.preventDefault();
-    hideAlert();
-    els.consultaResultado.classList.add("hidden");
-
-    const res = MediSysStore.findCita(els.consCodigo.value, els.consDocumento.value);
-    if (!res.ok) {
-      showAlert(res.error, "error");
-      return;
-    }
-    renderConsultaResult(res.cita);
-  }
-
-  function handleCancelarCita() {
-    if (!activeConsulta) return;
-    hideAlert();
-
-    const res = MediSysStore.cancelByPatient(
-      activeConsulta.codigo,
-      activeConsulta.documento,
-      els.consMotivo.value
-    );
-
-    if (!res.ok) {
-      showAlert(res.error, "error");
-      return;
-    }
-
-    showAlert("Cita cancelada. El bloque horario quedó disponible nuevamente.", "success");
-    renderConsultaResult(res.cita);
-  }
-
   function renderAdmin() {
-    const todas = MediSysStore.listCitas("TODOS");
-    const conteo = {
-      total: todas.length,
-      pendientes: todas.filter((c) => c.estado === "Pendiente").length,
-      confirmadas: todas.filter((c) => c.estado === "Confirmada").length,
-      canceladas: todas.filter((c) => c.estado === "Cancelada").length
-    };
+    const session = MediSysAuth.getSession();
+    const res = MediSysStore.listAllForAdmin(session, els.filtroEstado.value);
+    if (!res.ok) {
+      showAlert(res.error, "error");
+      return;
+    }
 
+    const { citas, todas } = res;
     els.metricasAdmin.innerHTML = "";
     [
-      { label: "Total citas", val: conteo.total },
-      { label: "Pendientes", val: conteo.pendientes },
-      { label: "Confirmadas", val: conteo.confirmadas },
-      { label: "Canceladas", val: conteo.canceladas }
+      { label: "Total citas", val: todas.length },
+      { label: "Pendientes", val: todas.filter((c) => c.estado === "Pendiente").length },
+      { label: "Confirmadas", val: todas.filter((c) => c.estado === "Confirmada").length },
+      { label: "Canceladas", val: todas.filter((c) => c.estado === "Cancelada").length }
     ].forEach((m) => {
       const card = document.createElement("div");
       card.className = "p-4 rounded-xl bg-slate-50 border border-slate-200";
@@ -295,10 +380,8 @@
       els.metricasAdmin.appendChild(card);
     });
 
-    const filtradas = MediSysStore.listCitas(els.filtroEstado.value);
     els.adminTablaCuerpo.innerHTML = "";
-
-    if (filtradas.length === 0) {
+    if (citas.length === 0) {
       const tr = document.createElement("tr");
       const td = document.createElement("td");
       td.colSpan = 6;
@@ -309,7 +392,7 @@
       return;
     }
 
-    filtradas.forEach((cita) => {
+    citas.forEach((cita) => {
       const tr = document.createElement("tr");
       tr.className = "hover:bg-slate-50";
 
@@ -369,14 +452,14 @@
 
         select.addEventListener("change", () => {
           if (!select.value) return;
-          const res = MediSysStore.transitionState(
+          const upd = MediSysStore.transitionState(
             cita.id,
             select.value,
-            "Administrador",
-            `Actualizado desde panel a ${select.value}`
+            session,
+            `Actualizado por administrador a ${select.value}`
           );
-          if (!res.ok) {
-            showAlert(res.error, "error");
+          if (!upd.ok) {
+            showAlert(upd.error, "error");
           } else {
             showAlert(`Cita ${cita.codigo} actualizada a ${select.value}.`, "success");
           }
@@ -397,22 +480,62 @@
   }
 
   function bindEvents() {
-    els.navButtons.forEach((btn) => {
-      btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+    els.authTabLogin.addEventListener("click", () => toggleAuthMode("login"));
+    els.authTabRegister.addEventListener("click", () => toggleAuthMode("register"));
+
+    els.formLogin.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      hideAlert();
+      const res = await MediSysAuth.login(els.loginIdentificador.value, els.loginPassword.value);
+      if (!res.ok) return showAlert(res.error, "error");
+
+      els.loginPassword.value = "";
+      showAlert(`Bienvenido, ${res.session.nombre}.`, "success");
+      syncUIWithSession();
     });
+
+    els.formRegister.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      hideAlert();
+      const res = await MediSysAuth.registerPaciente({
+        nombre: els.regNombre.value,
+        documento: els.regDocumento.value,
+        telefono: els.regTelefono.value,
+        password: els.regPassword.value
+      });
+      if (!res.ok) return showAlert(res.error, "error");
+
+      els.formRegister.reset();
+      showAlert("Cuenta creada e inicio de sesión exitoso.", "success");
+      syncUIWithSession();
+    });
+
+    els.btnLogout.addEventListener("click", () => {
+      MediSysAuth.logout();
+      els.comprobanteBox.classList.add("hidden");
+      showAlert("Sesión cerrada correctamente.", "info");
+      syncUIWithSession();
+    });
+
+    els.navButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        hideAlert();
+        switchTab(btn.dataset.tab);
+      });
+    });
+
     els.selEspecialidad.addEventListener("change", renderHorarios);
     els.inputFecha.addEventListener("change", renderHorarios);
     els.formAgendar.addEventListener("submit", handleAgendarSubmit);
-    els.formConsultar.addEventListener("submit", handleConsultarSubmit);
-    els.btnCancelarCita.addEventListener("click", handleCancelarCita);
     els.filtroEstado.addEventListener("change", renderAdmin);
   }
 
-  function init() {
+  async function init() {
+    await MediSysAuth.ensureDefaultAdmin();
     initEspecialidades();
     initFechas();
-    renderHorarios();
     bindEvents();
+    syncUIWithSession();
   }
 
   document.addEventListener("DOMContentLoaded", init);
