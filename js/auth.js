@@ -1,18 +1,23 @@
 const MediSysAuth = (() => {
   const KEYS = {
-    USERS: "medisys_users_roles_v1",
-    SESSION: "medisys_session_roles_v1",
-    LOCK: "medisys_lock_roles_v1"
+    USERS: "medisys_users_roles_v2",
+    SESSION: "medisys_session_roles_v2",
+    LOCK: "medisys_lock_roles_v2"
   };
   const MAX_ATTEMPTS = 5;
   const LOCK_MS = 5 * 60 * 1000;
 
   async function hashPassword(plain) {
+    if (!window.crypto || !window.crypto.subtle) {
+      throw new Error("Web Crypto API requiere HTTPS o localhost.");
+    }
     const buf = await window.crypto.subtle.digest(
       "SHA-256",
       new TextEncoder().encode("MEDISYS_ROLES_2026:" + plain)
     );
-    return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    return Array.from(new Uint8Array(buf))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
   }
 
   function readJSON(key, fallback) {
@@ -30,36 +35,41 @@ const MediSysAuth = (() => {
 
   async function ensureSeedUsers() {
     const users = readJSON(KEYS.USERS, []);
-    let changed = false;
+    const adminHash = await hashPassword("Admin2026*");
+    const medicoHash = await hashPassword("Medico2026*");
 
-    if (!users.some((u) => u.documento === "10000001" && u.role === "ADMIN")) {
-      users.push({
-        id: "ADM-001",
-        documento: "10000001",
-        nombre: "Administrador MediSys",
-        telefono: "3000000001",
-        role: "ADMIN",
-        especialidadId: null,
-        passwordHash: await hashPassword("Admin2026*")
-      });
-      changed = true;
-    }
+    const upsertUser = (seed) => {
+      const idx = users.findIndex((u) => u.documento === seed.documento && u.role === seed.role);
+      if (idx === -1) {
+        users.push(seed);
+      } else {
+        users[idx] = { ...users[idx], ...seed };
+      }
+    };
 
-    if (!users.some((u) => u.documento === "20000001" && u.role === "MEDICO")) {
-      users.push({
-        id: "MED-001",
-        documento: "20000001",
-        nombre: "Dr. Carlos Mendoza",
-        telefono: "3000000002",
-        role: "MEDICO",
-        especialidadId: "ESP-MG",
-        especialidadNombre: "Medicina General",
-        passwordHash: await hashPassword("Medico2026*")
-      });
-      changed = true;
-    }
+    upsertUser({
+      id: "ADM-001",
+      documento: "10000001",
+      nombre: "Administrador MediSys",
+      telefono: "3000000001",
+      role: "ADMIN",
+      especialidadId: null,
+      especialidadNombre: null,
+      passwordHash: adminHash
+    });
 
-    if (changed) writeJSON(KEYS.USERS, users);
+    upsertUser({
+      id: "MED-001",
+      documento: "20000001",
+      nombre: "Dr. Carlos Mendoza",
+      telefono: "3000000002",
+      role: "MEDICO",
+      especialidadId: "ESP-MG",
+      especialidadNombre: "Medicina General",
+      passwordHash: medicoHash
+    });
+
+    writeJSON(KEYS.USERS, users);
   }
 
   function getSession() {
@@ -106,6 +116,7 @@ const MediSysAuth = (() => {
       telefono,
       role: "PACIENTE",
       especialidadId: null,
+      especialidadNombre: null,
       passwordHash: await hashPassword(password)
     };
     users.push(user);
@@ -136,23 +147,27 @@ const MediSysAuth = (() => {
 
     const users = readJSON(KEYS.USERS, []);
     const user = users.find((u) => u.documento === doc && u.role === role);
-    const hash = await hashPassword(pass);
 
-    if (!user || user.passwordHash !== hash) {
-      const attempts = (lock.attempts || 0) + 1;
-      if (attempts >= MAX_ATTEMPTS) {
-        writeJSON(KEYS.LOCK, { attempts: 0, lockedUntil: now + LOCK_MS });
-        return { ok: false, error: "Demasiados intentos fallidos. Bloqueado por 5 minutos." };
+    try {
+      const hash = await hashPassword(pass);
+      if (!user || user.passwordHash !== hash) {
+        const attempts = (lock.attempts || 0) + 1;
+        if (attempts >= MAX_ATTEMPTS) {
+          writeJSON(KEYS.LOCK, { attempts: 0, lockedUntil: now + LOCK_MS });
+          return { ok: false, error: "Demasiados intentos fallidos. Bloqueado por 5 minutos." };
+        }
+        writeJSON(KEYS.LOCK, { attempts, lockedUntil: 0 });
+        return {
+          ok: false,
+          error: `Documento, rol o contraseña incorrectos (intento ${attempts} de ${MAX_ATTEMPTS}).`
+        };
       }
-      writeJSON(KEYS.LOCK, { attempts, lockedUntil: 0 });
-      return {
-        ok: false,
-        error: `Documento, rol o contraseña incorrectos (intento ${attempts} de ${MAX_ATTEMPTS}).`
-      };
-    }
 
-    writeJSON(KEYS.LOCK, { attempts: 0, lockedUntil: 0 });
-    return { ok: true, session: setSession(user) };
+      writeJSON(KEYS.LOCK, { attempts: 0, lockedUntil: 0 });
+      return { ok: true, session: setSession(user) };
+    } catch (err) {
+      return { ok: false, error: err.message || "Error al verificar credenciales." };
+    }
   }
 
   return { ensureSeedUsers, getSession, logout, registerPaciente, login };
