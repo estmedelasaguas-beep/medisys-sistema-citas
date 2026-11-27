@@ -1,48 +1,85 @@
-/* Estilos complementarios para estados, bloques horarios y navegación en MediSys */
-
-.nav-btn {
-  background-color: rgba(255, 255, 255, 0.12);
-  color: #f0fdfa;
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
-.nav-btn:hover {
-  background-color: rgba(255, 255, 255, 0.22);
+.vista-animada {
+  animation: fadeSlideUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.nav-btn--active {
-  background-color: #ffffff;
-  color: #115e59;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+button,
+.btn-anim {
+  transition:
+    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+button:hover:not(:disabled),
+.btn-anim:hover:not(:disabled) {
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 16px -4px rgba(15, 118, 110, 0.22);
+}
+
+button:active:not(:disabled),
+.btn-anim:active:not(:disabled) {
+  transform: translateY(0.5px) scale(0.98);
+}
+
+select.select-anim {
+  transition:
+    transform 0.18s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+select.select-anim:hover {
+  transform: translateY(-1px);
+  border-color: #0d9488;
+}
+
+select.select-anim:focus {
+  transform: scale(1.008);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.18);
 }
 
 .slot-btn {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.65rem 0.85rem;
+  justify-content: center;
+  padding: 0.65rem 0.75rem;
   border-radius: 0.75rem;
-  border: 1px solid #cbd5e1;
   font-size: 0.875rem;
   font-weight: 600;
-  transition: all 0.15s ease;
-}
-
-.slot-btn--available {
+  border: 1px solid #cbd5e1;
   background-color: #ffffff;
   color: #1e293b;
   cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .slot-btn--available:hover {
-  border-color: #0d9488;
   background-color: #f0fdfa;
+  border-color: #0d9488;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px -4px rgba(13, 148, 136, 0.22);
 }
 
 .slot-btn--selected {
-  border-color: #0f766e;
-  background-color: #ccfbf1;
-  color: #134e4a;
-  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.35);
+  background-color: #0f766e !important;
+  color: #ffffff !important;
+  border-color: #0f766e !important;
+  transform: scale(1.02);
+  box-shadow: 0 8px 18px -6px rgba(15, 118, 110, 0.45);
 }
 
 .slot-btn--occupied {
@@ -53,6 +90,13 @@
   cursor: not-allowed;
 }
 
+.nav-btn--active {
+  background-color: #ffffff !important;
+  color: #115e59 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -60,25 +104,9 @@
   border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.01em;
 }
 
-.badge--pendiente {
-  background-color: #fef3c7;
-  color: #92400e;
-}
-
-.badge--confirmada {
-  background-color: #dbeafe;
-  color: #1e40af;
-}
-
-.badge--atendida {
-  background-color: #d1fae5;
-  color: #065f46;
-}
-
-.badge--cancelada {
-  background-color: #ffe4e6;
-  color: #9f1239;
-}
+.badge--pendiente { background-color: #fef3c7; color: #92400e; }
+.badge--confirmada { background-color: #dbeafe; color: #1e40af; }
+.badge--atendida { background-color: #d1fae5; color: #065f46; }
+.badge--cancelada { background-color: #ffe4e6; color: #9f1239; }
